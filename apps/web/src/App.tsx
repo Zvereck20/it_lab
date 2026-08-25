@@ -1,4 +1,4 @@
-import { Box, Chip, Container, Paper, Stack, Typography } from '@mui/material';
+import { Box, Chip, Container, Paper, Typography } from '@mui/material';
 
 import { useGetHealthQuery } from './app/api';
 
@@ -19,7 +19,14 @@ export const App = () => {
     <Container maxWidth="sm">
       <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', py: 4 }}>
         <Paper elevation={3} sx={{ width: '100%', p: 4 }}>
-          <Stack spacing={2} alignItems="flex-start">
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              gap: 2,
+            }}
+          >
             <Typography component="h1" variant="h3">
               Айтилаб
             </Typography>
@@ -27,7 +34,7 @@ export const App = () => {
               Фундамент CRM для сервисного центра готов к разработке.
             </Typography>
             <Chip label={statusLabel} color={statusColor} variant="outlined" />
-          </Stack>
+          </Box>
         </Paper>
       </Box>
     </Container>
