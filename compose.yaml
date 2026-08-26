@@ -25,6 +25,8 @@ services:
       NODE_ENV: development
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-itlab}:${POSTGRES_PASSWORD:-itlab_dev_password}@postgres:5432/${POSTGRES_DB:-itlab}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
     ports:
       - "${API_PORT:-3000}:3000"
     volumes:

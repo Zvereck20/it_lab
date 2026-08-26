@@ -10,6 +10,9 @@ jobs:
   docker-check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      ADMIN_PASSWORD: ci-admin-password
+      SESSION_SECRET: ci-session-secret-with-at-least-32-characters
 
     steps:
       - name: Checkout repository
@@ -18,8 +21,17 @@ jobs:
       - name: Build containers
         run: docker compose build
 
+      - name: Start PostgreSQL
+        run: docker compose up --detach --wait postgres
+
+      - name: Prepare database and generated code
+        run: docker compose run --rm api sh -c "npm run build --workspace @itlab/contracts && npm run db:generate --workspace @itlab/api && npm run db:deploy --workspace @itlab/api"
+
       - name: Run type checks
         run: docker compose run --rm api npm run typecheck
+
+      - name: Run backend tests
+        run: docker compose run --rm --env NODE_ENV=test api npm run test --workspace @itlab/api
 
       - name: Run production builds
         run: docker compose run --rm api npm run build

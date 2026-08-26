@@ -11,6 +11,9 @@ RUN npm ci
 
 COPY . .
 
+RUN npm run build --workspace @itlab/contracts \
+    && npm run build --workspace @itlab/web
+
 EXPOSE 5173
 
-CMD ["npm", "run", "dev", "--workspace", "@itlab/web", "--", "--host", "0.0.0.0"]
+CMD ["sh", "-c", "npm run build --workspace @itlab/contracts && npm run dev --workspace @itlab/web -- --host 0.0.0.0"]
