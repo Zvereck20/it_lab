@@ -13,6 +13,7 @@ export type AuthRole = z.infer<typeof authRoleSchema>;
 export const authUserSchema = z.object({
   id: z.string().uuid().nullable(),
   login: z.string(),
+  name: z.string(),
   role: authRoleSchema,
 });
 
