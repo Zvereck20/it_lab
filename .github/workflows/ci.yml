@@ -43,7 +43,9 @@ jobs:
         run: curl --fail --retry 5 --retry-all-errors --retry-delay 2 http://localhost:3000/api/health
 
       - name: Check web application
-        run: curl --fail --retry 5 --retry-all-errors --retry-delay 2 http://localhost:5173
+        run: |
+          curl --fail --retry 5 --retry-all-errors --retry-delay 2 http://localhost:5173
+          curl --fail --retry 5 --retry-all-errors --retry-delay 2 http://localhost:5173/src/pages/LoginPage.tsx
 
       - name: Print container logs on failure
         if: failure()
