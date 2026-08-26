@@ -40,6 +40,7 @@ describe('authentication', () => {
       user: {
         id: null,
         login: 'BOSS',
+        name: 'Администратор',
         role: 'ADMIN',
       },
     });
