@@ -61,11 +61,13 @@ export const AppHeader = () => {
         <Toolbar disableGutters sx={{ minHeight: 72, py: 1 }}>
           <Stack
             direction={{ xs: 'column', lg: 'row' }}
-            alignItems={{ xs: 'stretch', lg: 'center' }}
             spacing={2}
-            sx={{ width: '100%' }}
+            sx={{
+              width: '100%',
+              alignItems: { xs: 'stretch', lg: 'center' },
+            }}
           >
-            <Stack direction="row" alignItems="center" spacing={2}>
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
               <IconButton
                 aria-label="Вернуться назад"
                 onClick={() => navigate(-1)}
@@ -104,9 +106,9 @@ export const AppHeader = () => {
               ))}
             </Stack>
 
-            <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
               <Box sx={{ textAlign: 'right' }}>
-                <Typography variant="body2" fontWeight={600}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
                   {displayName}
                 </Typography>
                 <Chip
