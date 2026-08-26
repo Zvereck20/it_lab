@@ -1,42 +1,19 @@
-import { Box, Chip, Container, Paper, Typography } from '@mui/material';
+import { Navigate, Route, Routes } from 'react-router';
 
-import { useGetHealthQuery } from './app/api';
+import { GuestRoute } from './components/GuestRoute';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { HomePage } from './pages/HomePage';
+import { LoginPage } from './pages/LoginPage';
 
-export const App = () => {
-  const { data, isError, isLoading } = useGetHealthQuery();
+export const App = () => (
+  <Routes>
+    <Route element={<GuestRoute />}>
+      <Route path="/login" element={<LoginPage />} />
+    </Route>
 
-  const statusLabel = isLoading
-    ? 'Проверка API'
-    : isError
-      ? 'API недоступен'
-      : data?.status === 'ok'
-        ? 'API работает'
-        : 'Нет данных';
-
-  const statusColor = data?.status === 'ok' ? 'success' : isError ? 'error' : 'default';
-
-  return (
-    <Container maxWidth="sm">
-      <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', py: 4 }}>
-        <Paper elevation={3} sx={{ width: '100%', p: 4 }}>
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-start',
-              gap: 2,
-            }}
-          >
-            <Typography component="h1" variant="h3">
-              Айтилаб
-            </Typography>
-            <Typography color="text.secondary">
-              Фундамент CRM для сервисного центра готов к разработке.
-            </Typography>
-            <Chip label={statusLabel} color={statusColor} variant="outlined" />
-          </Box>
-        </Paper>
-      </Box>
-    </Container>
-  );
-};
+    <Route element={<ProtectedRoute />}>
+      <Route path="/" element={<HomePage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Route>
+  </Routes>
+);

@@ -31,6 +31,19 @@ packages/
    Copy-Item .env.example .env
    ```
 
+   Для Bash:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Затем откройте `.env` и установите локальные значения:
+
+   ```env
+   ADMIN_PASSWORD=установите_согласованный_пароль
+   SESSION_SECRET=замените-на-случайную-строку-длиной-не-менее-32-символов
+   ```
+
 2. Запустите приложение:
 
    ```bash
@@ -41,6 +54,28 @@ packages/
 
    - frontend: <http://localhost:5173>;
    - API health check: <http://localhost:3000/api/health>.
+
+Для первого входа используйте логин `BOSS` и пароль из `ADMIN_PASSWORD`.
+
+## Авторизация
+
+- ADMIN задаётся конфигурацией и не хранится в базе данных;
+- MANAGER и TECHNICIAN будут создаваться позже через интерфейс ADMIN;
+- серверная сессия хранится в PostgreSQL и действует 8 часов;
+- cookie имеет флаги `httpOnly` и `sameSite=lax`;
+- все страницы, кроме `/login`, требуют действующую сессию.
+
+Применить сохранённые миграции вручную:
+
+```bash
+docker compose exec api npm run db:deploy
+```
+
+Создать новую миграцию во время разработки:
+
+```bash
+docker compose exec api npm run db:migrate -- --name migration_name
+```
 
 Остановка приложения:
 
