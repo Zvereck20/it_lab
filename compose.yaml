@@ -30,8 +30,9 @@ services:
     ports:
       - "${API_PORT:-3000}:3000"
     volumes:
-      - ./apps/api:/app/apps/api
-      - ./packages:/app/packages
+      - ./apps/api/src:/app/apps/api/src
+      - ./apps/api/prisma:/app/apps/api/prisma
+      - ./packages/contracts/src:/app/packages/contracts/src
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,8 +52,10 @@ services:
     ports:
       - "${WEB_PORT:-5173}:5173"
     volumes:
-      - ./apps/web:/app/apps/web
-      - ./packages:/app/packages
+      - ./apps/web/src:/app/apps/web/src
+      - ./apps/web/index.html:/app/apps/web/index.html
+      - ./apps/web/vite.config.ts:/app/apps/web/vite.config.ts
+      - ./packages/contracts/src:/app/packages/contracts/src
     depends_on:
       api:
         condition: service_healthy
