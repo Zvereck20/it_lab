@@ -37,7 +37,7 @@ const safePasswordCompare = (password: string, expectedPassword: string) => {
 const authenticate = async (login: string, password: string): Promise<AuthUser | null> => {
   if (login === ADMIN_LOGIN) {
     return safePasswordCompare(password, env.ADMIN_PASSWORD)
-      ? { id: null, login: ADMIN_LOGIN, role: 'ADMIN' }
+      ? { id: null, login: ADMIN_LOGIN, name: 'Администратор', role: 'ADMIN' }
       : null;
   }
 
@@ -50,6 +50,7 @@ const authenticate = async (login: string, password: string): Promise<AuthUser |
   return {
     id: user.id,
     login: user.login,
+    name: user.name,
     role: user.role,
   };
 };
