@@ -61,6 +61,7 @@ describe('authentication', () => {
 describe('inventory', () => {
   it('supports dependent categories, server filters and protected deletion', async () => {
     const agent = request.agent(app);
+    const suffix = Date.now().toString();
 
     await agent
       .post('/api/auth/login')
@@ -69,18 +70,18 @@ describe('inventory', () => {
 
     const printersResponse = await agent
       .post('/api/inventory/categories/main')
-      .send({ name: 'Принтеры' })
+      .send({ name: `Принтеры ${suffix}` })
       .expect(201);
 
     const computersResponse = await agent
       .post('/api/inventory/categories/main')
-      .send({ name: 'Компьютеры' })
+      .send({ name: `Компьютеры ${suffix}` })
       .expect(201);
 
     const sparePartsResponse = await agent
       .post('/api/inventory/categories/additional')
       .send({
-        name: 'Запчасти',
+        name: `Запчасти ${suffix}`,
         mainCategoryIds: [printersResponse.body.id, computersResponse.body.id],
       })
       .expect(201);
