@@ -155,7 +155,7 @@ export const InventoryItemFormPage = () => {
           type="number"
           error={Boolean(errors.count)}
           helperText={errors.count?.message}
-          inputProps={{ min: 0, step: 1 }}
+          slotProps={{ htmlInput: { min: 0, step: 1 } }}
           {...register('count', { valueAsNumber: true })}
         />
 
