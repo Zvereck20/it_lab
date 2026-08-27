@@ -162,7 +162,7 @@ export const InventoryCategoriesPage = () => {
               label="Название основной категории"
               value={mainName}
               onChange={(event) => setMainName(event.target.value)}
-              inputProps={{ maxLength: 100 }}
+              slotProps={{ htmlInput: { maxLength: 100 } }}
               required
               fullWidth
             />
@@ -226,7 +226,7 @@ export const InventoryCategoriesPage = () => {
               label="Название дополнительной категории"
               value={additionalName}
               onChange={(event) => setAdditionalName(event.target.value)}
-              inputProps={{ maxLength: 100 }}
+              slotProps={{ htmlInput: { maxLength: 100 } }}
               required
             />
 
