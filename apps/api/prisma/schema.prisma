@@ -33,3 +33,55 @@ model Session {
   @@index([expire])
   @@map("user_sessions")
 }
+
+model MainCategory {
+  id                   String                           @id @default(uuid()) @db.Uuid
+  name                 String                           @unique @db.VarChar(100)
+  createdAt            DateTime                         @default(now()) @db.Timestamp(3)
+  updatedAt            DateTime                         @updatedAt @db.Timestamp(3)
+  additionalCategories MainCategoryAdditionalCategory[]
+  inventoryItems       InventoryItem[]
+
+  @@map("main_categories")
+}
+
+model AdditionalCategory {
+  id             String                           @id @default(uuid()) @db.Uuid
+  name           String                           @unique @db.VarChar(100)
+  createdAt      DateTime                         @default(now()) @db.Timestamp(3)
+  updatedAt      DateTime                         @updatedAt @db.Timestamp(3)
+  mainCategories MainCategoryAdditionalCategory[]
+  inventoryItems InventoryItem[]
+
+  @@map("additional_categories")
+}
+
+model MainCategoryAdditionalCategory {
+  mainCategoryId       String             @db.Uuid
+  additionalCategoryId String             @db.Uuid
+  mainCategory         MainCategory       @relation(fields: [mainCategoryId], references: [id], onDelete: Cascade)
+  additionalCategory   AdditionalCategory @relation(fields: [additionalCategoryId], references: [id], onDelete: Cascade)
+
+  @@id([mainCategoryId, additionalCategoryId])
+  @@index([additionalCategoryId])
+  @@map("main_category_additional_categories")
+}
+
+model InventoryItem {
+  id                   String              @id @default(uuid()) @db.Uuid
+  name                 String              @db.VarChar(150)
+  description          String?
+  count                Int                 @default(0)
+  mainCategoryId       String              @db.Uuid
+  additionalCategoryId String?             @db.Uuid
+  createdAt            DateTime            @default(now()) @db.Timestamp(3)
+  updatedAt            DateTime            @updatedAt @db.Timestamp(3)
+  mainCategory         MainCategory        @relation(fields: [mainCategoryId], references: [id], onDelete: Restrict)
+  additionalCategory   AdditionalCategory? @relation(fields: [additionalCategoryId], references: [id], onDelete: Restrict)
+
+  @@index([name])
+  @@index([mainCategoryId])
+  @@index([additionalCategoryId])
+  @@index([mainCategoryId, additionalCategoryId])
+  @@map("inventory_items")
+}
