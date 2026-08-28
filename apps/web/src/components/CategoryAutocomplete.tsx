@@ -6,7 +6,7 @@ import {
   Stack,
   TextField,
 } from '@mui/material';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
@@ -61,22 +61,33 @@ export const CategoryAutocomplete = ({
   error,
   helperText,
 }: CategoryAutocompleteProps) => {
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebouncedValue(search);
   const selectedOption = options.find((option) => option.id === value) ?? null;
+  const [inputValue, setInputValue] = useState(selectedOption?.name ?? '');
+  const debouncedSearch = useDebouncedValue(inputValue);
+
+  useEffect(() => {
+    setInputValue(selectedOption?.name ?? '');
+  }, [selectedOption?.id, selectedOption?.name]);
 
   return (
     <Autocomplete
       options={options}
       value={selectedOption}
+      inputValue={inputValue}
       disabled={disabled}
+      selectOnFocus
       getOptionLabel={(option) => option.name}
       isOptionEqualToValue={(option, selected) => option.id === selected.id}
       filterOptions={(availableOptions) => filterBySearch(availableOptions, debouncedSearch)}
       onInputChange={(_event, inputValue, reason) => {
-        setSearch(reason === 'input' ? inputValue : '');
+        if (reason === 'input' || reason === 'clear') {
+          setInputValue(inputValue);
+        }
       }}
-      onChange={(_event, option) => onChange(option?.id ?? '')}
+      onChange={(_event, option) => {
+        onChange(option?.id ?? '');
+        setInputValue(option?.name ?? '');
+      }}
       noOptionsText="Категории не найдены"
       slotProps={{ listbox: listboxSlotProps }}
       renderInput={(params) => (
@@ -103,23 +114,30 @@ export const MultipleCategoryAutocomplete = ({
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
   const selectedOptions = options.filter((option) => value.includes(option.id));
+  const availableOptions = options.filter((option) => !value.includes(option.id));
 
   return (
     <Stack spacing={1}>
       <Autocomplete
-        multiple
-        filterSelectedOptions
-        options={options}
-        value={selectedOptions}
+        options={availableOptions}
+        value={null}
+        inputValue={search}
         disabled={disabled}
+        selectOnFocus
         getOptionLabel={(option) => option.name}
         isOptionEqualToValue={(option, selected) => option.id === selected.id}
         filterOptions={(availableOptions) => filterBySearch(availableOptions, debouncedSearch)}
         onInputChange={(_event, inputValue, reason) => {
-          setSearch(reason === 'input' ? inputValue : '');
+          if (reason === 'input' || reason === 'clear') {
+            setSearch(inputValue);
+          }
         }}
-        onChange={(_event, selected) => onChange(selected.map((option) => option.id))}
-        renderValue={() => null}
+        onChange={(_event, selected) => {
+          if (selected) {
+            onChange([...value, selected.id]);
+            setSearch('');
+          }
+        }}
         noOptionsText="Категории не найдены"
         slotProps={{ listbox: listboxSlotProps }}
         renderInput={(params) => (
