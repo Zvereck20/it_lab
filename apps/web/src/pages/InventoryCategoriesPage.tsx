@@ -2,14 +2,8 @@ import {
   Alert,
   Box,
   Button,
-  Checkbox,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  ListItemText,
-  MenuItem,
   Paper,
-  Select,
   Stack,
   Table,
   TableBody,
@@ -23,6 +17,7 @@ import {
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 
+import { MultipleCategoryAutocomplete } from '../components/CategoryAutocomplete';
 import {
   useCreateAdditionalCategoryMutation,
   useCreateMainCategoryMutation,
@@ -230,30 +225,19 @@ export const InventoryCategoriesPage = () => {
               required
             />
 
-            <FormControl required>
-              <InputLabel id="additional-main-categories-label">Основные категории</InputLabel>
-              <Select
-                labelId="additional-main-categories-label"
-                label="Основные категории"
-                multiple
-                value={additionalMainIds}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setAdditionalMainIds(typeof value === 'string' ? value.split(',') : value);
-                }}
-                renderValue={(selected) => selected
-                  .map((id) => data?.mainCategories.find((category) => category.id === id)?.name)
-                  .filter(Boolean)
-                  .join(', ')}
-              >
-                {data?.mainCategories.map((category) => (
-                  <MenuItem key={category.id} value={category.id}>
-                    <Checkbox checked={additionalMainIds.includes(category.id)} />
-                    <ListItemText primary={category.name} />
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <MultipleCategoryAutocomplete
+              label="Основные категории"
+              options={data?.mainCategories ?? []}
+              value={additionalMainIds}
+              onChange={setAdditionalMainIds}
+              disabled={isWorking}
+              error={additionalMainIds.length === 0}
+              helperText={
+                additionalMainIds.length === 0
+                  ? 'Выберите хотя бы одну основную категорию'
+                  : undefined
+              }
+            />
 
             <Stack direction="row" spacing={2}>
               <Button
