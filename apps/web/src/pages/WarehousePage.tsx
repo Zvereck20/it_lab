@@ -4,12 +4,8 @@ import {
   Box,
   Button,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  MenuItem,
   Pagination,
   Paper,
-  Select,
   Stack,
   Table,
   TableBody,
@@ -25,6 +21,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 
 import { useGetSessionQuery } from '../app/api';
+import { CategoryAutocomplete } from '../components/CategoryAutocomplete';
 import {
   useDeleteInventoryItemMutation,
   useGetInventoryCategoriesQuery,
@@ -102,7 +99,7 @@ export const WarehousePage = () => {
 
         {role === 'ADMIN' && (
           <Link to="/warehouse/categories" style={{ textDecoration: 'none' }}>
-            <Button variant="text">Категории</Button>
+            <Button variant="outlined">Категории</Button>
           </Link>
         )}
 
@@ -133,51 +130,52 @@ export const WarehousePage = () => {
             </Button>
           </Stack>
 
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-            <FormControl fullWidth size="small">
-              <InputLabel id="main-category-filter-label">Основная категория</InputLabel>
-              <Select
-                labelId="main-category-filter-label"
-                label="Основная категория"
-                value={mainCategoryId}
-                onChange={(event) => {
-                  setMainCategoryId(event.target.value);
-                  setAdditionalCategoryId('');
-                }}
-              >
-                <MenuItem value="">Все категории</MenuItem>
-                {categories?.mainCategories.map((category) => (
-                  <MenuItem key={category.id} value={category.id}>
-                    {category.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: 'minmax(0, 1fr)',
+                md: 'repeat(2, minmax(0, 1fr))',
+                lg: 'minmax(220px, 1fr) minmax(220px, 1fr) auto auto',
+              },
+              gap: 2,
+            }}
+          >
+            <CategoryAutocomplete
+              label="Основная категория"
+              options={categories?.mainCategories ?? []}
+              value={mainCategoryId}
+              onChange={(value) => {
+                setMainCategoryId(value);
+                setAdditionalCategoryId('');
+              }}
+            />
 
-            <FormControl fullWidth size="small" disabled={!mainCategoryId}>
-              <InputLabel id="additional-category-filter-label">Доп. категория</InputLabel>
-              <Select
-                labelId="additional-category-filter-label"
-                label="Доп. категория"
-                value={additionalCategoryId}
-                onChange={(event) => setAdditionalCategoryId(event.target.value)}
-              >
-                <MenuItem value="">Все категории</MenuItem>
-                {availableAdditionalCategories.map((category) => (
-                  <MenuItem key={category.id} value={category.id}>
-                    {category.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <CategoryAutocomplete
+              label="Доп. категория"
+              options={availableAdditionalCategories}
+              value={additionalCategoryId}
+              onChange={setAdditionalCategoryId}
+              disabled={!mainCategoryId}
+            />
 
-            <Button variant="contained" onClick={handleFilter} disabled={isFetching}>
+            <Button
+              variant="contained"
+              onClick={handleFilter}
+              disabled={isFetching}
+              sx={{ whiteSpace: 'nowrap' }}
+            >
               Фильтр
             </Button>
-            <Button variant="outlined" onClick={handleReset} disabled={isFetching}>
+            <Button
+              variant="outlined"
+              onClick={handleReset}
+              disabled={isFetching}
+              sx={{ whiteSpace: 'nowrap' }}
+            >
               Сбросить
             </Button>
-          </Stack>
+          </Box>
         </Stack>
       </Paper>
 
