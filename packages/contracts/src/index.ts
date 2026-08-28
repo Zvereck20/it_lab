@@ -103,7 +103,7 @@ export const inventoryItemInputSchema = z.object({
     .int('Количество должно быть целым числом')
     .min(0, 'Количество не может быть отрицательным'),
   mainCategoryId: z.string().uuid('Выберите основную категорию'),
-  additionalCategoryId: z.string().uuid().nullable(),
+  additionalCategoryId: z.string().uuid('Выберите дополнительную категорию'),
 });
 
 export type InventoryItemInput = z.infer<typeof inventoryItemInputSchema>;
@@ -111,7 +111,7 @@ export type InventoryItemInput = z.infer<typeof inventoryItemInputSchema>;
 export const inventoryItemSchema = inventoryItemInputSchema.extend({
   id: z.string().uuid(),
   mainCategory: mainCategorySchema,
-  additionalCategory: mainCategorySchema.nullable(),
+  additionalCategory: mainCategorySchema,
 });
 
 export type InventoryItem = z.infer<typeof inventoryItemSchema>;
