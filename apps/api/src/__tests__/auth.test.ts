@@ -88,6 +88,17 @@ describe('inventory', () => {
 
     expect(sparePartsResponse.body.mainCategoryIds).toHaveLength(2);
 
+    await agent
+      .post('/api/inventory/items')
+      .send({
+        name: 'Позиция без дополнительной категории',
+        description: '',
+        count: 1,
+        mainCategoryId: printersResponse.body.id,
+        additionalCategoryId: null,
+      })
+      .expect(400);
+
     const itemResponse = await agent
       .post('/api/inventory/items')
       .send({
