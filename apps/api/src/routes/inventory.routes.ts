@@ -59,7 +59,7 @@ const mapInventoryItem = (item: {
 
 const validateCategoryPair = async (
   mainCategoryId: string,
-  additionalCategoryId: string | null,
+  additionalCategoryId: string,
 ) => {
   const mainCategory = await prisma.mainCategory.findUnique({
     where: { id: mainCategoryId },
@@ -68,10 +68,6 @@ const validateCategoryPair = async (
 
   if (!mainCategory) {
     return 'Основная категория не найдена';
-  }
-
-  if (!additionalCategoryId) {
-    return null;
   }
 
   const categoryLink = await prisma.mainCategoryAdditionalCategory.findUnique({
