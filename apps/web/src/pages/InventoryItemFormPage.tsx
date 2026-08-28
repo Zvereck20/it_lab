@@ -6,12 +6,7 @@ import {
   Box,
   Button,
   CircularProgress,
-  FormControl,
-  FormHelperText,
-  InputLabel,
-  MenuItem,
   Paper,
-  Select,
   Stack,
   TextField,
   Typography,
@@ -20,6 +15,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router';
 
+import { CategoryAutocomplete } from '../components/CategoryAutocomplete';
 import {
   useCreateInventoryItemMutation,
   useGetInventoryCategoriesQuery,
@@ -33,7 +29,7 @@ const emptyItem: InventoryItemInput = {
   description: '',
   count: 0,
   mainCategoryId: '',
-  additionalCategoryId: null,
+  additionalCategoryId: '',
 };
 
 export const InventoryItemFormPage = () => {
@@ -89,7 +85,7 @@ export const InventoryItemFormPage = () => {
       && additionalCategoryId
       && !availableAdditionalCategories.some((category) => category.id === additionalCategoryId)
     ) {
-      setValue('additionalCategoryId', null);
+      setValue('additionalCategoryId', '');
     }
   }, [
     additionalCategoryId,
@@ -163,21 +159,14 @@ export const InventoryItemFormPage = () => {
           name="mainCategoryId"
           control={control}
           render={({ field }) => (
-            <FormControl error={Boolean(errors.mainCategoryId)}>
-              <InputLabel id="item-main-category-label">Основная категория</InputLabel>
-              <Select
-                {...field}
-                labelId="item-main-category-label"
-                label="Основная категория"
-              >
-                {categories?.mainCategories.map((category) => (
-                  <MenuItem key={category.id} value={category.id}>
-                    {category.name}
-                  </MenuItem>
-                ))}
-              </Select>
-              <FormHelperText>{errors.mainCategoryId?.message}</FormHelperText>
-            </FormControl>
+            <CategoryAutocomplete
+              label="Основная категория"
+              options={categories?.mainCategories ?? []}
+              value={field.value}
+              onChange={field.onChange}
+              error={Boolean(errors.mainCategoryId)}
+              helperText={errors.mainCategoryId?.message}
+            />
           )}
         />
 
@@ -185,27 +174,15 @@ export const InventoryItemFormPage = () => {
           name="additionalCategoryId"
           control={control}
           render={({ field }) => (
-            <FormControl
-              error={Boolean(errors.additionalCategoryId)}
+            <CategoryAutocomplete
+              label="Доп. категория"
+              options={availableAdditionalCategories}
+              value={field.value}
+              onChange={field.onChange}
               disabled={!mainCategoryId}
-            >
-              <InputLabel id="item-additional-category-label">Доп. категория</InputLabel>
-              <Select
-                {...field}
-                value={field.value ?? ''}
-                labelId="item-additional-category-label"
-                label="Доп. категория"
-                onChange={(event) => field.onChange(event.target.value || null)}
-              >
-                <MenuItem value="">Без дополнительной категории</MenuItem>
-                {availableAdditionalCategories.map((category) => (
-                  <MenuItem key={category.id} value={category.id}>
-                    {category.name}
-                  </MenuItem>
-                ))}
-              </Select>
-              <FormHelperText>{errors.additionalCategoryId?.message}</FormHelperText>
-            </FormControl>
+              error={Boolean(errors.additionalCategoryId)}
+              helperText={errors.additionalCategoryId?.message}
+            />
           )}
         />
 
