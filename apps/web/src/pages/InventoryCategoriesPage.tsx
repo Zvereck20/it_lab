@@ -35,6 +35,7 @@ export const InventoryCategoriesPage = () => {
   const [editingMainId, setEditingMainId] = useState<string>();
   const [additionalName, setAdditionalName] = useState('');
   const [additionalMainIds, setAdditionalMainIds] = useState<string[]>([]);
+  const [isAdditionalSelectionTouched, setIsAdditionalSelectionTouched] = useState(false);
   const [editingAdditionalId, setEditingAdditionalId] = useState<string>();
   const [actionError, setActionError] = useState<string>();
   const [createMain, createMainState] = useCreateMainCategoryMutation();
@@ -61,6 +62,7 @@ export const InventoryCategoriesPage = () => {
   const resetAdditionalForm = () => {
     setAdditionalName('');
     setAdditionalMainIds([]);
+    setIsAdditionalSelectionTouched(false);
     setEditingAdditionalId(undefined);
   };
 
@@ -229,11 +231,14 @@ export const InventoryCategoriesPage = () => {
               label="Основные категории"
               options={data?.mainCategories ?? []}
               value={additionalMainIds}
-              onChange={setAdditionalMainIds}
+              onChange={(value) => {
+                setAdditionalMainIds(value);
+                setIsAdditionalSelectionTouched(true);
+              }}
               disabled={isWorking}
-              error={additionalMainIds.length === 0}
+              error={isAdditionalSelectionTouched && additionalMainIds.length === 0}
               helperText={
-                additionalMainIds.length === 0
+                isAdditionalSelectionTouched && additionalMainIds.length === 0
                   ? 'Выберите хотя бы одну основную категорию'
                   : undefined
               }
@@ -281,6 +286,7 @@ export const InventoryCategoriesPage = () => {
                           setEditingAdditionalId(category.id);
                           setAdditionalName(category.name);
                           setAdditionalMainIds(category.mainCategoryIds);
+                          setIsAdditionalSelectionTouched(false);
                         }}
                       >
                         Изменить
