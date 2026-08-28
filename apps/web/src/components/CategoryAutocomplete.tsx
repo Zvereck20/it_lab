@@ -119,7 +119,7 @@ export const MultipleCategoryAutocomplete = ({
           setSearch(reason === 'input' ? inputValue : '');
         }}
         onChange={(_event, selected) => onChange(selected.map((option) => option.id))}
-        renderTags={() => null}
+        renderValue={() => null}
         noOptionsText="Категории не найдены"
         slotProps={{ listbox: listboxSlotProps }}
         renderInput={(params) => (
