@@ -71,6 +71,7 @@ export const CategoryAutocomplete = ({
 
   return (
     <Autocomplete
+      sx={{ '& .MuiAutocomplete-clearIndicator': { display: 'none' } }}
       options={options}
       value={selectedOption}
       inputValue={inputValue}
@@ -119,6 +120,7 @@ export const MultipleCategoryAutocomplete = ({
   return (
     <Stack spacing={1}>
       <Autocomplete
+        sx={{ '& .MuiAutocomplete-clearIndicator': { display: 'none' } }}
         options={availableOptions}
         value={null}
         inputValue={search}

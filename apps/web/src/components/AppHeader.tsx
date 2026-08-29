@@ -18,7 +18,7 @@ import { useAppDispatch } from '../app/store';
 const navigationItems = [
   { label: 'Задачи', path: '/', end: true },
   { label: 'Склад', path: '/warehouse' },
-  { label: 'Заказы', path: '/orders' },
+  { label: 'Ремонт', path: '/repairs' },
 ];
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -104,6 +104,15 @@ export const AppHeader = () => {
                   )}
                 </NavLink>
               ))}
+              {data?.user.role === 'ADMIN' && (
+                <NavLink to="/employees" style={{ textDecoration: 'none' }}>
+                  {({ isActive }) => (
+                    <Button variant={isActive ? 'contained' : 'text'}>
+                      Сотрудники
+                    </Button>
+                  )}
+                </NavLink>
+              )}
             </Stack>
 
             <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>

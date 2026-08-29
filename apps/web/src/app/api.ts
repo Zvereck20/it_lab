@@ -11,7 +11,14 @@ export const api = createApi({
     baseUrl: '/api',
     credentials: 'include',
   }),
-  tagTypes: ['Session', 'InventoryItems', 'InventoryCategories'],
+  tagTypes: [
+    'Session',
+    'InventoryItems',
+    'InventoryCategories',
+    'Employees',
+    'Technicians',
+    'Repairs',
+  ],
   endpoints: (builder) => ({
     getHealth: builder.query<HealthResponse, void>({
       query: () => '/health',

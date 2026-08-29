@@ -12,6 +12,14 @@ enum Role {
   TECHNICIAN
 }
 
+enum RepairStatus {
+  CREATED
+  IN_PROGRESS
+  REVIEW
+  REVISION
+  COMPLETED
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   login        String   @unique @db.VarChar(50)
@@ -21,8 +29,27 @@ model User {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now()) @db.Timestamp(3)
   updatedAt    DateTime @updatedAt @db.Timestamp(3)
+  repairs      Repair[]
 
   @@map("users")
+}
+
+model Repair {
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String       @db.VarChar(150)
+  description  String?
+  technicianId String?      @db.Uuid
+  dueDate      DateTime     @db.Date
+  status       RepairStatus @default(CREATED)
+  createdAt    DateTime     @default(now()) @db.Timestamp(3)
+  updatedAt    DateTime     @updatedAt @db.Timestamp(3)
+  technician   User?        @relation(fields: [technicianId], references: [id], onDelete: Restrict)
+
+  @@index([name])
+  @@index([technicianId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("repairs")
 }
 
 model Session {
