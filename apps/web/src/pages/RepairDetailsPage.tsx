@@ -128,7 +128,11 @@ export const RepairDetailsPage = () => {
 
   return (
     <Stack spacing={3}>
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={2}
+        sx={{ alignItems: { md: 'center' } }}
+      >
         <Typography component="h1" variant="h4" sx={{ flexGrow: 1 }}>
           Карточка ремонта
         </Typography>
