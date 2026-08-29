@@ -63,7 +63,6 @@ describe('inventory', () => {
   it('supports dependent categories, server filters and protected deletion', async () => {
     const agent = request.agent(app);
     const suffix = Date.now().toString();
-
     await agent
       .post('/api/auth/login')
       .send({ login: 'BOSS', password: process.env.ADMIN_PASSWORD })
@@ -96,7 +95,7 @@ describe('inventory', () => {
         description: '',
         count: 1,
         mainCategoryId: printersResponse.body.id,
-        additionalCategoryId: null,
+        additionalCategoryIds: [],
       })
       .expect(400);
 
@@ -107,9 +106,10 @@ describe('inventory', () => {
         description: 'Для проверки поиска по описанию',
         count: 12,
         mainCategoryId: printersResponse.body.id,
-        additionalCategoryId: sparePartsResponse.body.id,
+        additionalCategoryIds: [sparePartsResponse.body.id],
       })
       .expect(201);
+    expect(itemResponse.body.additionalCategoryIds).toEqual([sparePartsResponse.body.id]);
 
     const filteredResponse = await agent
       .get('/api/inventory/items')
@@ -152,6 +152,15 @@ describe('employees and repairs', () => {
   it('supports employee CRUD and server-side repair filters', async () => {
     const agent = request.agent(app);
     const suffix = Date.now().toString();
+    const individualCustomer = {
+      customerType: 'INDIVIDUAL',
+      customerPhone: '+7 900 000-00-00',
+      customerFirstName: 'Иван',
+      customerLastName: 'Иванов',
+      customerMiddleName: '',
+      companyName: '',
+      inn: '',
+    };
 
     await agent
       .post('/api/auth/login')
@@ -185,12 +194,13 @@ describe('employees and repairs', () => {
       .send({
         name: `Ремонт без сотрудника ${suffix}`,
         description: 'Проверка необязательного ответственного',
+        ...individualCustomer,
         technicianId: null,
-        dueDate: '2026-09-10',
       })
       .expect(201);
 
     expect(unassignedRepairResponse.body.status).toBe('CREATED');
+    expect(unassignedRepairResponse.body.assignmentMode).toBe('FREE_QUEUE');
     expect(unassignedRepairResponse.body.technician).toBeNull();
 
     await agent
@@ -198,8 +208,8 @@ describe('employees and repairs', () => {
       .send({
         name: `Некорректное назначение ${suffix}`,
         description: '',
+        ...individualCustomer,
         technicianId: managerResponse.body.id,
-        dueDate: '2026-09-11',
       })
       .expect(400);
 
@@ -208,10 +218,28 @@ describe('employees and repairs', () => {
       .send({
         name: `Ремонт принтера ${suffix}`,
         description: 'Поиск ремонта по описанию устройства',
+        ...individualCustomer,
         technicianId: technicianResponse.body.id,
-        dueDate: '2026-09-12',
       })
       .expect(201);
+
+    const technicianAgent = request.agent(app);
+    await technicianAgent
+      .post('/api/auth/login')
+      .send({ login: `tech-${suffix}`, password: 'test-password-123' })
+      .expect(200);
+
+    const takenRepairResponse = await technicianAgent
+      .post(`/api/repairs/${unassignedRepairResponse.body.id}/take`)
+      .expect(200);
+    expect(takenRepairResponse.body.assignmentMode).toBe('ASSIGNED');
+    expect(takenRepairResponse.body.technician.id).toBe(technicianResponse.body.id);
+
+    const statusResponse = await technicianAgent
+      .patch(`/api/repairs/${unassignedRepairResponse.body.id}/status`)
+      .send({ status: 'DIAGNOSTICS' })
+      .expect(200);
+    expect(statusResponse.body.status).toBe('DIAGNOSTICS');
 
     const filteredResponse = await agent
       .get('/api/repairs')
@@ -249,8 +277,18 @@ describe('employees and repairs', () => {
       .send({
         name: `Ремонт принтера ${suffix}`,
         description: 'Ответственный снят',
+        ...individualCustomer,
         technicianId: null,
-        dueDate: '2026-09-13',
+      })
+      .expect(200);
+
+    await agent
+      .patch(`/api/repairs/${unassignedRepairResponse.body.id}`)
+      .send({
+        name: `Ремонт без сотрудника ${suffix}`,
+        description: 'Возвращён в свободную кассу',
+        ...individualCustomer,
+        technicianId: null,
       })
       .expect(200);
 

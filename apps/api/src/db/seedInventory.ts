@@ -64,12 +64,24 @@ export const seedInventory = async () => {
       ].join(' '),
       count: (index * 7) % 51,
       mainCategoryId: categoryLink.mainCategoryId,
-      additionalCategoryId: categoryLink.additionalCategoryId,
+      additionalCategoryIds: [categoryLink.additionalCategoryId],
     }];
   });
 
   if (itemsToCreate.length > 0) {
-    await prisma.inventoryItem.createMany({ data: itemsToCreate });
+    await prisma.$transaction(
+      itemsToCreate.map(({ additionalCategoryIds, ...item }) =>
+        prisma.inventoryItem.create({
+          data: {
+            ...item,
+            additionalCategories: {
+              create: additionalCategoryIds.map((additionalCategoryId) => ({
+                additionalCategoryId,
+              })),
+            },
+          },
+        })),
+    );
   }
 
   console.info(

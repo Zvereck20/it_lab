@@ -1,4 +1,4 @@
-import type { RepairInput } from '@itlab/contracts';
+import type { CustomerType, RepairInput } from '@itlab/contracts';
 import { repairInputSchema } from '@itlab/contracts';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -7,9 +7,13 @@ import {
   Button,
   CircularProgress,
   FormControl,
+  FormControlLabel,
+  FormLabel,
   InputLabel,
   MenuItem,
   Paper,
+  Radio,
+  RadioGroup,
   Select,
   Stack,
   TextField,
@@ -30,8 +34,14 @@ import {
 const emptyRepair: RepairInput = {
   name: '',
   description: '',
+  customerType: 'INDIVIDUAL',
+  customerPhone: '',
+  customerFirstName: '',
+  customerLastName: '',
+  customerMiddleName: '',
+  companyName: '',
+  inn: '',
   technicianId: null,
-  dueDate: '',
 };
 
 export const RepairFormPage = () => {
@@ -52,19 +62,27 @@ export const RepairFormPage = () => {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<RepairInput>({
     resolver: zodResolver(repairInputSchema),
     defaultValues: emptyRepair,
   });
+  const customerType = watch('customerType');
 
   useEffect(() => {
     if (repair) {
       reset({
         name: repair.name,
         description: repair.description,
+        customerType: repair.customerType,
+        customerPhone: repair.customerPhone,
+        customerFirstName: repair.customerFirstName,
+        customerLastName: repair.customerLastName,
+        customerMiddleName: repair.customerMiddleName,
+        companyName: repair.companyName,
+        inn: repair.inn,
         technicianId: repair.technicianId,
-        dueDate: repair.dueDate,
       });
     }
   }, [repair, reset]);
@@ -75,10 +93,11 @@ export const RepairFormPage = () => {
     try {
       if (id) {
         await updateRepair({ id, body: values }).unwrap();
+        navigate(`/repairs/${id}`);
       } else {
-        await createRepair(values).unwrap();
+        const createdRepair = await createRepair(values).unwrap();
+        navigate(`/repairs/${createdRepair.id}`);
       }
-      navigate('/repairs');
     } catch (error) {
       setApiError(getApiErrorMessage(error, 'Не удалось сохранить ремонт'));
     }
@@ -97,7 +116,7 @@ export const RepairFormPage = () => {
   }
 
   return (
-    <Paper component="main" variant="outlined" sx={{ maxWidth: 760, mx: 'auto', p: 4 }}>
+    <Paper component="main" variant="outlined" sx={{ maxWidth: 820, mx: 'auto', p: 4 }}>
       <Stack component="form" spacing={3} onSubmit={onSubmit} noValidate>
         <Typography component="h1" variant="h4">
           {isEditing ? 'Редактирование ремонта' : 'Новый ремонт'}
@@ -121,6 +140,85 @@ export const RepairFormPage = () => {
           {...register('description')}
         />
 
+        <Typography component="h2" variant="h5">
+          Заказчик
+        </Typography>
+
+        <Controller
+          name="customerType"
+          control={control}
+          render={({ field }) => (
+            <FormControl>
+              <FormLabel id="customer-type-label">Тип заказчика</FormLabel>
+              <RadioGroup
+                row
+                aria-labelledby="customer-type-label"
+                value={field.value}
+                onChange={(_event, value) => field.onChange(value as CustomerType)}
+              >
+                <FormControlLabel value="INDIVIDUAL" control={<Radio />} label="Физ. лицо" />
+                <FormControlLabel value="LEGAL_ENTITY" control={<Radio />} label="Юр. лицо" />
+              </RadioGroup>
+            </FormControl>
+          )}
+        />
+
+        <TextField
+          label="Телефон"
+          error={Boolean(errors.customerPhone)}
+          helperText={errors.customerPhone?.message}
+          slotProps={{ htmlInput: { maxLength: 30, inputMode: 'tel' } }}
+          {...register('customerPhone')}
+        />
+
+        {customerType === 'LEGAL_ENTITY' && (
+          <>
+            <TextField
+              label="Название компании"
+              error={Boolean(errors.companyName)}
+              helperText={errors.companyName?.message}
+              {...register('companyName')}
+            />
+            <TextField
+              label="ИНН"
+              error={Boolean(errors.inn)}
+              helperText={errors.inn?.message}
+              slotProps={{ htmlInput: { maxLength: 12, inputMode: 'numeric' } }}
+              {...register('inn')}
+            />
+            <Typography component="h3" variant="h6">
+              Контактное лицо
+            </Typography>
+          </>
+        )}
+
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
+            gap: 2,
+          }}
+        >
+          <TextField
+            label="Фамилия"
+            error={Boolean(errors.customerLastName)}
+            helperText={errors.customerLastName?.message}
+            {...register('customerLastName')}
+          />
+          <TextField
+            label="Имя"
+            error={Boolean(errors.customerFirstName)}
+            helperText={errors.customerFirstName?.message}
+            {...register('customerFirstName')}
+          />
+          <TextField
+            label="Отчество (необязательно)"
+            error={Boolean(errors.customerMiddleName)}
+            helperText={errors.customerMiddleName?.message}
+            {...register('customerMiddleName')}
+          />
+        </Box>
+
         <Controller
           name="technicianId"
           control={control}
@@ -133,7 +231,7 @@ export const RepairFormPage = () => {
                 value={field.value ?? ''}
                 onChange={(event) => field.onChange(event.target.value || null)}
               >
-                <MenuItem value="">Сотрудник не выбран</MenuItem>
+                <MenuItem value="">Свободная касса</MenuItem>
                 {technicians?.employees.map((employee) => (
                   <MenuItem key={employee.id} value={employee.id}>
                     {employee.name}
@@ -144,18 +242,11 @@ export const RepairFormPage = () => {
           )}
         />
 
-        <TextField
-          label="Плановый срок ремонта"
-          type="date"
-          error={Boolean(errors.dueDate)}
-          helperText={errors.dueDate?.message}
-          slotProps={{ inputLabel: { shrink: true } }}
-          {...register('dueDate')}
-        />
-
-        <Alert severity="info">
-          Новый ремонт будет создан со статусом «Создан».
-        </Alert>
+        {!isEditing && (
+          <Alert severity="info">
+            Новый ремонт будет создан со статусом «Создан».
+          </Alert>
+        )}
 
         <Stack direction="row" spacing={2}>
           <Button
@@ -165,7 +256,10 @@ export const RepairFormPage = () => {
           >
             {createState.isLoading || updateState.isLoading ? 'Сохранение...' : 'Сохранить'}
           </Button>
-          <Button variant="outlined" onClick={() => navigate('/repairs')}>
+          <Button
+            variant="outlined"
+            onClick={() => navigate(isEditing && id ? `/repairs/${id}` : '/repairs')}
+          >
             Отмена
           </Button>
         </Stack>

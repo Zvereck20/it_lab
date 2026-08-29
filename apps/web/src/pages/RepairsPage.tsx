@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   FormControl,
   InputLabel,
@@ -21,31 +20,32 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import type { FormEvent } from 'react';
+import type { FormEvent, KeyboardEvent } from 'react';
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 
 import { useGetSessionQuery } from '../app/api';
 import { useGetTechniciansQuery } from '../features/employees/api/employeesApi';
-import { getApiErrorMessage } from '../features/inventory/getApiErrorMessage';
-import {
-  useDeleteRepairMutation,
-  useGetRepairsQuery,
-} from '../features/repairs/api/repairsApi';
-import { repairStatuses, repairStatusLabels } from '../features/repairs/repairStatus';
+import { useGetRepairsQuery } from '../features/repairs/api/repairsApi';
+import { repairStatuses } from '../features/repairs/repairStatus';
 
-const formatDate = (value: string) => value.split('-').reverse().join('.');
+const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
 
 export const RepairsPage = () => {
+  const navigate = useNavigate();
   const { data: session } = useGetSessionQuery();
   const { data: technicians } = useGetTechniciansQuery();
   const [query, setQuery] = useState<RepairListQuery>({ page: 1 });
   const [search, setSearch] = useState('');
   const [technicianId, setTechnicianId] = useState('');
   const [status, setStatus] = useState('');
-  const [actionError, setActionError] = useState<string>();
   const { data, isFetching, isError } = useGetRepairsQuery(query);
-  const [deleteRepair, deleteState] = useDeleteRepairMutation();
   const role = session?.user.role;
   const canManageRepairs = role === 'ADMIN' || role === 'MANAGER';
 
@@ -74,16 +74,10 @@ export const RepairsPage = () => {
     setQuery({ page: 1 });
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Удалить ремонт «${name}»?`)) {
-      return;
-    }
-
-    setActionError(undefined);
-    try {
-      await deleteRepair(id).unwrap();
-    } catch (error) {
-      setActionError(getApiErrorMessage(error, 'Не удалось удалить ремонт'));
+  const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, id: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      navigate(`/repairs/${id}`);
     }
   };
 
@@ -145,7 +139,7 @@ export const RepairsPage = () => {
                 onChange={(event) => setTechnicianId(event.target.value)}
               >
                 <MenuItem value="">Все сотрудники</MenuItem>
-                <MenuItem value="unassigned">Сотрудник не выбран</MenuItem>
+                <MenuItem value="free_queue">Свободная касса</MenuItem>
                 {technicians?.employees.map((employee) => (
                   <MenuItem key={employee.id} value={employee.id}>
                     {employee.name}
@@ -179,7 +173,6 @@ export const RepairsPage = () => {
         </Stack>
       </Paper>
 
-      {actionError && <Alert severity="error">{actionError}</Alert>}
       {isError && <Alert severity="error">Не удалось загрузить ремонты</Alert>}
 
       <TableContainer component={Paper} variant="outlined">
@@ -189,52 +182,50 @@ export const RepairsPage = () => {
               <TableCell>Наименование</TableCell>
               <TableCell>Описание</TableCell>
               <TableCell>Ответственный</TableCell>
-              <TableCell>Срок</TableCell>
-              <TableCell>Статус</TableCell>
-              {canManageRepairs && <TableCell align="right">Действия</TableCell>}
+              <TableCell>Дата создания</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {isFetching && !data ? (
               <TableRow>
-                <TableCell colSpan={canManageRepairs ? 6 : 5} align="center" sx={{ py: 6 }}>
+                <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
                   <CircularProgress size={32} />
                 </TableCell>
               </TableRow>
             ) : data?.items.length ? (
               data.items.map((repair) => (
-                <TableRow key={repair.id} hover>
+                <TableRow
+                  key={repair.id}
+                  hover
+                  tabIndex={0}
+                  role="link"
+                  onClick={() => navigate(`/repairs/${repair.id}`)}
+                  onKeyDown={(event) => handleRowKeyDown(event, repair.id)}
+                  sx={{ cursor: 'pointer' }}
+                >
                   <TableCell>{repair.name}</TableCell>
-                  <TableCell sx={{ maxWidth: 360, whiteSpace: 'normal' }}>
+                  <TableCell
+                    title={repair.description}
+                    sx={{
+                      maxWidth: 380,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {repair.description || '—'}
                   </TableCell>
-                  <TableCell>{repair.technician?.name ?? 'Сотрудник не выбран'}</TableCell>
-                  <TableCell>{formatDate(repair.dueDate)}</TableCell>
                   <TableCell>
-                    <Chip label={repairStatusLabels[repair.status]} size="small" />
+                    {repair.assignmentMode === 'FREE_QUEUE'
+                      ? 'Свободная касса'
+                      : repair.technician?.name ?? '—'}
                   </TableCell>
-                  {canManageRepairs && (
-                    <TableCell align="right">
-                      <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-                        <Link to={`/repairs/${repair.id}/edit`} style={{ textDecoration: 'none' }}>
-                          <Button size="small">Изменить</Button>
-                        </Link>
-                        <Button
-                          size="small"
-                          color="error"
-                          disabled={deleteState.isLoading}
-                          onClick={() => handleDelete(repair.id, repair.name)}
-                        >
-                          Удалить
-                        </Button>
-                      </Stack>
-                    </TableCell>
-                  )}
+                  <TableCell>{dateTimeFormatter.format(new Date(repair.createdAt))}</TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={canManageRepairs ? 6 : 5} align="center" sx={{ py: 6 }}>
+                <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
                   Ремонты не найдены
                 </TableCell>
               </TableRow>

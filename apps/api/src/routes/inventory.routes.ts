@@ -21,12 +21,15 @@ const inventoryItemSelect = {
   description: true,
   count: true,
   mainCategoryId: true,
-  additionalCategoryId: true,
   mainCategory: {
     select: { id: true, name: true },
   },
-  additionalCategory: {
-    select: { id: true, name: true },
+  additionalCategories: {
+    select: {
+      additionalCategory: {
+        select: { id: true, name: true },
+      },
+    },
   },
 } satisfies Prisma.InventoryItemSelect;
 
@@ -49,17 +52,26 @@ const mapInventoryItem = (item: {
   description: string | null;
   count: number;
   mainCategoryId: string;
-  additionalCategoryId: string | null;
   mainCategory: { id: string; name: string };
-  additionalCategory: { id: string; name: string } | null;
-}) => ({
-  ...item,
-  description: item.description ?? '',
-});
+  additionalCategories: Array<{
+    additionalCategory: { id: string; name: string };
+  }>;
+}) => {
+  const additionalCategories = item.additionalCategories
+    .map((link) => link.additionalCategory)
+    .sort((left, right) => left.name.localeCompare(right.name, 'ru-RU'));
 
-const validateCategoryPair = async (
+  return {
+    ...item,
+    description: item.description ?? '',
+    additionalCategoryIds: additionalCategories.map((category) => category.id),
+    additionalCategories,
+  };
+};
+
+const validateCategoryLinks = async (
   mainCategoryId: string,
-  additionalCategoryId: string,
+  additionalCategoryIds: string[],
 ) => {
   const mainCategory = await prisma.mainCategory.findUnique({
     where: { id: mainCategoryId },
@@ -70,17 +82,16 @@ const validateCategoryPair = async (
     return 'Основная категория не найдена';
   }
 
-  const categoryLink = await prisma.mainCategoryAdditionalCategory.findUnique({
+  const categoryLinksCount = await prisma.mainCategoryAdditionalCategory.count({
     where: {
-      mainCategoryId_additionalCategoryId: {
-        mainCategoryId,
-        additionalCategoryId,
-      },
+      mainCategoryId,
+      additionalCategoryId: { in: additionalCategoryIds },
     },
-    select: { mainCategoryId: true },
   });
 
-  return categoryLink ? null : 'Дополнительная категория не связана с выбранной основной';
+  return categoryLinksCount === additionalCategoryIds.length
+    ? null
+    : 'Одна из дополнительных категорий не связана с выбранной основной';
 };
 
 export const inventoryRouter = Router();
@@ -255,12 +266,14 @@ inventoryRouter.patch('/categories/additional/:id', allowRoles('ADMIN'), async (
     return;
   }
 
-  const incompatibleItem = await prisma.inventoryItem.findFirst({
+  const incompatibleItem = await prisma.inventoryItemAdditionalCategory.findFirst({
     where: {
       additionalCategoryId: parsedId.data,
-      mainCategoryId: { notIn: parsedBody.data.mainCategoryIds },
+      inventoryItem: {
+        mainCategoryId: { notIn: parsedBody.data.mainCategoryIds },
+      },
     },
-    select: { id: true },
+    select: { inventoryItemId: true },
   });
 
   if (incompatibleItem) {
@@ -323,7 +336,7 @@ inventoryRouter.delete('/categories/additional/:id', allowRoles('ADMIN'), async 
     return;
   }
 
-  const usedItems = await prisma.inventoryItem.count({
+  const usedItems = await prisma.inventoryItemAdditionalCategory.count({
     where: { additionalCategoryId: parsedId.data },
   });
 
@@ -373,7 +386,13 @@ inventoryRouter.get('/items', async (request, response) => {
         }
       : {}),
     ...(mainCategoryId ? { mainCategoryId } : {}),
-    ...(additionalCategoryId ? { additionalCategoryId } : {}),
+    ...(additionalCategoryId
+      ? {
+          additionalCategories: {
+            some: { additionalCategoryId },
+          },
+        }
+      : {}),
   };
 
   const [items, total] = await Promise.all([
@@ -427,9 +446,9 @@ inventoryRouter.post('/items', allowRoles('MANAGER'), async (request, response) 
     return;
   }
 
-  const pairError = await validateCategoryPair(
+  const pairError = await validateCategoryLinks(
     parsedBody.data.mainCategoryId,
-    parsedBody.data.additionalCategoryId,
+    parsedBody.data.additionalCategoryIds,
   );
 
   if (pairError) {
@@ -439,8 +458,15 @@ inventoryRouter.post('/items', allowRoles('MANAGER'), async (request, response) 
 
   const item = await prisma.inventoryItem.create({
     data: {
-      ...parsedBody.data,
+      name: parsedBody.data.name,
       description: parsedBody.data.description || null,
+      count: parsedBody.data.count,
+      mainCategoryId: parsedBody.data.mainCategoryId,
+      additionalCategories: {
+        create: parsedBody.data.additionalCategoryIds.map((additionalCategoryId) => ({
+          additionalCategoryId,
+        })),
+      },
     },
     select: inventoryItemSelect,
   });
@@ -457,9 +483,9 @@ inventoryRouter.patch('/items/:id', allowRoles('MANAGER'), async (request, respo
     return;
   }
 
-  const pairError = await validateCategoryPair(
+  const pairError = await validateCategoryLinks(
     parsedBody.data.mainCategoryId,
-    parsedBody.data.additionalCategoryId,
+    parsedBody.data.additionalCategoryIds,
   );
 
   if (pairError) {
@@ -471,8 +497,16 @@ inventoryRouter.patch('/items/:id', allowRoles('MANAGER'), async (request, respo
     const item = await prisma.inventoryItem.update({
       where: { id: parsedId.data },
       data: {
-        ...parsedBody.data,
+        name: parsedBody.data.name,
         description: parsedBody.data.description || null,
+        count: parsedBody.data.count,
+        mainCategoryId: parsedBody.data.mainCategoryId,
+        additionalCategories: {
+          deleteMany: {},
+          create: parsedBody.data.additionalCategoryIds.map((additionalCategoryId) => ({
+            additionalCategoryId,
+          })),
+        },
       },
       select: inventoryItemSelect,
     });

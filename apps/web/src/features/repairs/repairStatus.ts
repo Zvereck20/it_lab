@@ -2,8 +2,9 @@ import type { RepairStatus } from '@itlab/contracts';
 
 export const repairStatusLabels: Record<RepairStatus, string> = {
   CREATED: 'Создан',
+  DIAGNOSTICS: 'Диагностика',
+  APPROVAL: 'Согласование',
   IN_PROGRESS: 'В работе',
-  REVIEW: 'Проверка',
   REVISION: 'Доработка',
   COMPLETED: 'Выполнен',
 };

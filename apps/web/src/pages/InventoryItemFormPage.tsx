@@ -15,7 +15,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router';
 
-import { CategoryAutocomplete } from '../components/CategoryAutocomplete';
+import {
+  CategoryAutocomplete,
+  MultipleCategoryAutocomplete,
+} from '../components/CategoryAutocomplete';
 import {
   useCreateInventoryItemMutation,
   useGetInventoryCategoriesQuery,
@@ -29,7 +32,7 @@ const emptyItem: InventoryItemInput = {
   description: '',
   count: 0,
   mainCategoryId: '',
-  additionalCategoryId: '',
+  additionalCategoryIds: [],
 };
 
 export const InventoryItemFormPage = () => {
@@ -60,7 +63,7 @@ export const InventoryItemFormPage = () => {
   });
 
   const mainCategoryId = watch('mainCategoryId');
-  const additionalCategoryId = watch('additionalCategoryId');
+  const additionalCategoryIds = watch('additionalCategoryIds');
   const availableAdditionalCategories = useMemo(
     () => categories?.additionalCategories.filter((category) =>
       category.mainCategoryIds.includes(mainCategoryId)) ?? [],
@@ -74,7 +77,7 @@ export const InventoryItemFormPage = () => {
         description: item.description,
         count: item.count,
         mainCategoryId: item.mainCategoryId,
-        additionalCategoryId: item.additionalCategoryId,
+        additionalCategoryIds: item.additionalCategoryIds,
       });
     }
   }, [item, reset]);
@@ -82,13 +85,17 @@ export const InventoryItemFormPage = () => {
   useEffect(() => {
     if (
       categories
-      && additionalCategoryId
-      && !availableAdditionalCategories.some((category) => category.id === additionalCategoryId)
+      && additionalCategoryIds.some((id) =>
+        !availableAdditionalCategories.some((category) => category.id === id))
     ) {
-      setValue('additionalCategoryId', '');
+      setValue(
+        'additionalCategoryIds',
+        additionalCategoryIds.filter((id) =>
+          availableAdditionalCategories.some((category) => category.id === id)),
+      );
     }
   }, [
-    additionalCategoryId,
+    additionalCategoryIds,
     availableAdditionalCategories,
     categories,
     setValue,
@@ -171,17 +178,17 @@ export const InventoryItemFormPage = () => {
         />
 
         <Controller
-          name="additionalCategoryId"
+          name="additionalCategoryIds"
           control={control}
           render={({ field }) => (
-            <CategoryAutocomplete
-              label="Доп. категория"
+            <MultipleCategoryAutocomplete
+              label="Дополнительные категории"
               options={availableAdditionalCategories}
               value={field.value}
               onChange={field.onChange}
               disabled={!mainCategoryId}
-              error={Boolean(errors.additionalCategoryId)}
-              helperText={errors.additionalCategoryId?.message}
+              error={Boolean(errors.additionalCategoryIds)}
+              helperText={errors.additionalCategoryIds?.message}
             />
           )}
         />
