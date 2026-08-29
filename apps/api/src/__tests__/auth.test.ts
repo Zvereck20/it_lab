@@ -3,6 +3,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { createApp } from '../app.js';
 import { prisma } from '../db/prisma.js';
+import { seedInventory } from '../db/seedInventory.js';
 import { sessionPool } from '../db/sessionPool.js';
 
 const app = createApp();
@@ -257,6 +258,37 @@ describe('employees and repairs', () => {
     await agent.delete(`/api/repairs/${assignedRepairResponse.body.id}`).expect(204);
     await agent.delete(`/api/repairs/${unassignedRepairResponse.body.id}`).expect(204);
     await agent.delete(`/api/employees/${managerResponse.body.id}`).expect(204);
+  });
+});
+
+describe('inventory development seed', () => {
+  it('creates 100 database items from existing category links without duplicates', async () => {
+    const suffix = Date.now().toString();
+    const mainCategory = await prisma.mainCategory.create({
+      data: { name: `Seed основная ${suffix}` },
+    });
+    const additionalCategory = await prisma.additionalCategory.create({
+      data: {
+        name: `Seed дополнительная ${suffix}`,
+        mainCategories: {
+          create: { mainCategoryId: mainCategory.id },
+        },
+      },
+    });
+
+    await seedInventory();
+    await seedInventory();
+
+    const mockItemsCount = await prisma.inventoryItem.count({
+      where: { name: { startsWith: 'Тестовая складская позиция ' } },
+    });
+    expect(mockItemsCount).toBe(100);
+
+    await prisma.inventoryItem.deleteMany({
+      where: { name: { startsWith: 'Тестовая складская позиция ' } },
+    });
+    await prisma.additionalCategory.delete({ where: { id: additionalCategory.id } });
+    await prisma.mainCategory.delete({ where: { id: mainCategory.id } });
   });
 });
 

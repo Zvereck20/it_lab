@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspace @itlab/contracts && npm run build --workspace @itlab/api && npm run build --workspace @itlab/web",
+    "db:seed": "npm run db:seed --workspace @itlab/api",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "engines": {
