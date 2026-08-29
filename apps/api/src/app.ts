@@ -7,6 +7,9 @@ import { SESSION_COOKIE_NAME, SESSION_DURATION_MS } from './config/auth.js';
 import { env } from './config/env.js';
 import { sessionPool } from './db/sessionPool.js';
 import { authRouter } from './routes/auth.routes.js';
+import { employeesRouter } from './routes/employees.routes.js';
+import { inventoryRouter } from './routes/inventory.routes.js';
+import { repairsRouter } from './routes/repairs.routes.js';
 
 const PostgresSessionStore = connectPgSimple(session);
 
@@ -45,6 +48,9 @@ export const createApp = () => {
   });
 
   app.use('/api/auth', authRouter);
+  app.use('/api/employees', employeesRouter);
+  app.use('/api/inventory', inventoryRouter);
+  app.use('/api/repairs', repairsRouter);
 
   app.use((_request, response) => {
     response.status(404).json({

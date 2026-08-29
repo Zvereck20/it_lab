@@ -44,3 +44,223 @@ export const apiErrorSchema = z.object({
 });
 
 export type ApiError = z.infer<typeof apiErrorSchema>;
+
+export const categoryNameSchema = z
+  .string()
+  .trim()
+  .min(1, 'Введите название категории')
+  .max(100, 'Название не должно превышать 100 символов');
+
+export const mainCategoryInputSchema = z.object({
+  name: categoryNameSchema,
+});
+
+export type MainCategoryInput = z.infer<typeof mainCategoryInputSchema>;
+
+export const additionalCategoryInputSchema = z.object({
+  name: categoryNameSchema,
+  mainCategoryIds: z
+    .array(z.string().uuid())
+    .min(1, 'Выберите хотя бы одну основную категорию'),
+});
+
+export type AdditionalCategoryInput = z.infer<typeof additionalCategoryInputSchema>;
+
+export const mainCategorySchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+});
+
+export type MainCategory = z.infer<typeof mainCategorySchema>;
+
+export const additionalCategorySchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  mainCategoryIds: z.array(z.string().uuid()),
+});
+
+export type AdditionalCategory = z.infer<typeof additionalCategorySchema>;
+
+export const inventoryCategoriesResponseSchema = z.object({
+  mainCategories: z.array(mainCategorySchema),
+  additionalCategories: z.array(additionalCategorySchema),
+});
+
+export type InventoryCategoriesResponse = z.infer<typeof inventoryCategoriesResponseSchema>;
+
+export const inventoryItemInputSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Введите наименование')
+    .max(150, 'Наименование не должно превышать 150 символов'),
+  description: z
+    .string()
+    .trim()
+    .max(2_000, 'Описание не должно превышать 2000 символов'),
+  count: z
+    .number({ error: 'Укажите количество' })
+    .int('Количество должно быть целым числом')
+    .min(0, 'Количество не может быть отрицательным'),
+  mainCategoryId: z.string().uuid('Выберите основную категорию'),
+  additionalCategoryId: z.string().uuid('Выберите дополнительную категорию'),
+});
+
+export type InventoryItemInput = z.infer<typeof inventoryItemInputSchema>;
+
+export const inventoryItemSchema = inventoryItemInputSchema.extend({
+  id: z.string().uuid(),
+  mainCategory: mainCategorySchema,
+  additionalCategory: mainCategorySchema,
+});
+
+export type InventoryItem = z.infer<typeof inventoryItemSchema>;
+
+export const inventoryListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  search: z.string().trim().max(200).optional(),
+  mainCategoryId: z.string().uuid().optional(),
+  additionalCategoryId: z.string().uuid().optional(),
+});
+
+export type InventoryListQuery = z.infer<typeof inventoryListQuerySchema>;
+
+export const inventoryListResponseSchema = z.object({
+  items: z.array(inventoryItemSchema),
+  pagination: z.object({
+    page: z.number().int(),
+    limit: z.literal(50),
+    total: z.number().int(),
+    totalPages: z.number().int(),
+  }),
+});
+
+export type InventoryListResponse = z.infer<typeof inventoryListResponseSchema>;
+
+export const employeeRoleSchema = z.enum(['MANAGER', 'TECHNICIAN']);
+
+export type EmployeeRole = z.infer<typeof employeeRoleSchema>;
+
+const employeeLoginSchema = z
+  .string()
+  .trim()
+  .min(1, 'Введите логин')
+  .max(50, 'Логин не должен превышать 50 символов')
+  .regex(/^[A-Za-z0-9._-]+$/, 'Используйте латинские буквы, цифры, точку, дефис или _');
+
+const employeeNameSchema = z
+  .string()
+  .trim()
+  .min(1, 'Введите имя сотрудника')
+  .max(100, 'Имя не должно превышать 100 символов');
+
+const employeePasswordSchema = z
+  .string()
+  .min(8, 'Пароль должен содержать не менее 8 символов')
+  .max(128, 'Пароль не должен превышать 128 символов');
+
+export const employeeCreateInputSchema = z.object({
+  login: employeeLoginSchema,
+  name: employeeNameSchema,
+  password: employeePasswordSchema,
+  role: employeeRoleSchema,
+});
+
+export type EmployeeCreateInput = z.infer<typeof employeeCreateInputSchema>;
+
+export const employeeUpdateInputSchema = z.object({
+  login: employeeLoginSchema,
+  name: employeeNameSchema,
+  password: employeePasswordSchema.optional(),
+  role: employeeRoleSchema,
+});
+
+export type EmployeeUpdateInput = z.infer<typeof employeeUpdateInputSchema>;
+
+export const employeeSchema = z.object({
+  id: z.string().uuid(),
+  login: z.string(),
+  name: z.string(),
+  role: employeeRoleSchema,
+  isActive: z.boolean(),
+  createdAt: z.string().datetime(),
+});
+
+export type Employee = z.infer<typeof employeeSchema>;
+
+export const employeesResponseSchema = z.object({
+  employees: z.array(employeeSchema),
+});
+
+export type EmployeesResponse = z.infer<typeof employeesResponseSchema>;
+
+export const repairStatusSchema = z.enum([
+  'CREATED',
+  'IN_PROGRESS',
+  'REVIEW',
+  'REVISION',
+  'COMPLETED',
+]);
+
+export type RepairStatus = z.infer<typeof repairStatusSchema>;
+
+const repairDueDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Укажите дату ремонта')
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }, 'Укажите корректную дату ремонта');
+
+export const repairInputSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Введите наименование ремонта')
+    .max(150, 'Наименование не должно превышать 150 символов'),
+  description: z
+    .string()
+    .trim()
+    .max(2_000, 'Описание не должно превышать 2000 символов'),
+  technicianId: z.string().uuid('Выберите сотрудника').nullable(),
+  dueDate: repairDueDateSchema,
+});
+
+export type RepairInput = z.infer<typeof repairInputSchema>;
+
+const repairTechnicianSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  login: z.string(),
+});
+
+export const repairSchema = repairInputSchema.extend({
+  id: z.string().uuid(),
+  status: repairStatusSchema,
+  technician: repairTechnicianSchema.nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export type Repair = z.infer<typeof repairSchema>;
+
+export const repairListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  search: z.string().trim().max(200).optional(),
+  technicianId: z.union([z.string().uuid(), z.literal('unassigned')]).optional(),
+  status: repairStatusSchema.optional(),
+});
+
+export type RepairListQuery = z.infer<typeof repairListQuerySchema>;
+
+export const repairListResponseSchema = z.object({
+  items: z.array(repairSchema),
+  pagination: z.object({
+    page: z.number().int(),
+    limit: z.literal(50),
+    total: z.number().int(),
+    totalPages: z.number().int(),
+  }),
+});
+
+export type RepairListResponse = z.infer<typeof repairListResponseSchema>;
