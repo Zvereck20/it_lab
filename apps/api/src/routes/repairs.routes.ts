@@ -1,5 +1,5 @@
 import type { Prisma } from '../generated/prisma/client.js';
-import type { RepairInput } from '@itlab/contracts';
+import type { AuthUser, RepairInput } from '@itlab/contracts';
 import {
   repairInputSchema,
   repairListQuerySchema,
@@ -36,6 +36,22 @@ const repairSelect = {
   },
 } satisfies Prisma.RepairSelect;
 
+const repairDetailsSelect = {
+  ...repairSelect,
+  statusHistory: {
+    orderBy: [{ changedAt: 'desc' as const }, { id: 'desc' as const }],
+    select: {
+      id: true,
+      status: true,
+      changedAt: true,
+      changedByUserId: true,
+      changedByName: true,
+      changedByRole: true,
+      comment: true,
+    },
+  },
+} satisfies Prisma.RepairSelect;
+
 type SelectedRepair = {
   id: string;
   name: string;
@@ -55,6 +71,18 @@ type SelectedRepair = {
   technician: { id: string; name: string; login: string } | null;
 };
 
+type SelectedRepairDetails = SelectedRepair & {
+  statusHistory: Array<{
+    id: string;
+    status: SelectedRepair['status'];
+    changedAt: Date;
+    changedByUserId: string | null;
+    changedByName: string;
+    changedByRole: 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | null;
+    comment: string | null;
+  }>;
+};
+
 const isPrismaError = (error: unknown, code: string) =>
   Boolean(error && typeof error === 'object' && 'code' in error && error.code === code);
 
@@ -69,6 +97,14 @@ const mapRepair = (repair: SelectedRepair) => ({
   customerMiddleName: repair.customerMiddleName ?? '',
   companyName: repair.companyName ?? '',
   inn: repair.inn ?? '',
+});
+
+const mapRepairDetails = (repair: SelectedRepairDetails) => ({
+  ...mapRepair(repair),
+  statusHistory: repair.statusHistory.map((entry) => ({
+    ...entry,
+    comment: entry.comment ?? '',
+  })),
 });
 
 const validateTechnician = async (technicianId: string | null) => {
@@ -104,6 +140,18 @@ const buildRepairData = (input: RepairInput) => ({
   technicianId: input.technicianId,
 });
 
+const buildStatusHistoryData = (
+  user: AuthUser,
+  status: SelectedRepair['status'],
+  comment = '',
+) => ({
+  status,
+  changedByUserId: user.id,
+  changedByName: user.name,
+  changedByRole: user.role,
+  comment: comment || null,
+});
+
 export const repairsRouter = Router();
 
 repairsRouter.use(requireAuth);
@@ -137,7 +185,7 @@ repairsRouter.get('/', async (request, response) => {
   const [repairs, total] = await Promise.all([
     prisma.repair.findMany({
       where,
-      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
       skip: (page - 1) * REPAIR_PAGE_SIZE,
       take: REPAIR_PAGE_SIZE,
       select: repairSelect,
@@ -166,7 +214,7 @@ repairsRouter.get('/:id', async (request, response) => {
 
   const repair = await prisma.repair.findUnique({
     where: { id: parsedId.data },
-    select: repairSelect,
+    select: repairDetailsSelect,
   });
 
   if (!repair) {
@@ -174,7 +222,7 @@ repairsRouter.get('/:id', async (request, response) => {
     return;
   }
 
-  response.json(mapRepair(repair));
+  response.json(mapRepairDetails(repair));
 });
 
 repairsRouter.post('/', allowRoles('MANAGER'), async (request, response) => {
@@ -191,8 +239,19 @@ repairsRouter.post('/', allowRoles('MANAGER'), async (request, response) => {
     return;
   }
 
+  const user = request.session.user;
+  if (!user) {
+    response.status(401).json({ code: 'UNAUTHORIZED', message: 'Требуется авторизация' });
+    return;
+  }
+
   const repair = await prisma.repair.create({
-    data: buildRepairData(parsedBody.data),
+    data: {
+      ...buildRepairData(parsedBody.data),
+      statusHistory: {
+        create: buildStatusHistoryData(user, 'CREATED'),
+      },
+    },
     select: repairSelect,
   });
 
@@ -285,6 +344,11 @@ repairsRouter.patch('/:id/status', allowRoles('MANAGER', 'TECHNICIAN'), async (r
     return;
   }
 
+  if (!user) {
+    response.status(401).json({ code: 'UNAUTHORIZED', message: 'Требуется авторизация' });
+    return;
+  }
+
   if (user?.role === 'TECHNICIAN') {
     if (!user.id) {
       response.status(403).json({
@@ -315,7 +379,16 @@ repairsRouter.patch('/:id/status', allowRoles('MANAGER', 'TECHNICIAN'), async (r
   try {
     const repair = await prisma.repair.update({
       where: { id: parsedId.data },
-      data: { status: parsedBody.data.status },
+      data: {
+        status: parsedBody.data.status,
+        statusHistory: {
+          create: buildStatusHistoryData(
+            user,
+            parsedBody.data.status,
+            parsedBody.data.comment,
+          ),
+        },
+      },
       select: repairSelect,
     });
     response.json(mapRepair(repair));

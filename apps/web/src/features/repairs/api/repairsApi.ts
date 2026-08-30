@@ -1,5 +1,6 @@
 import type {
   Repair,
+  RepairDetails,
   RepairInput,
   RepairListQuery,
   RepairListResponse,
@@ -19,7 +20,7 @@ export const repairsApi = api.injectEndpoints({
       query: (params) => ({ url: '/repairs', params }),
       providesTags: ['Repairs'],
     }),
-    getRepair: builder.query<Repair, string>({
+    getRepair: builder.query<RepairDetails, string>({
       query: (id) => `/repairs/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Repairs', id }],
     }),

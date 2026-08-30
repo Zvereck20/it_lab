@@ -31,6 +31,12 @@ enum RepairAssignmentMode {
   ASSIGNED
 }
 
+enum HistoryActorRole {
+  ADMIN
+  MANAGER
+  TECHNICIAN
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   login        String   @unique @db.VarChar(50)
@@ -41,6 +47,7 @@ model User {
   createdAt    DateTime @default(now()) @db.Timestamp(3)
   updatedAt    DateTime @updatedAt @db.Timestamp(3)
   repairs      Repair[]
+  statusChanges RepairStatusHistory[]
 
   @@map("users")
 }
@@ -62,12 +69,30 @@ model Repair {
   createdAt          DateTime             @default(now()) @db.Timestamp(3)
   updatedAt          DateTime             @updatedAt @db.Timestamp(3)
   technician         User?                @relation(fields: [technicianId], references: [id], onDelete: Restrict)
+  statusHistory      RepairStatusHistory[]
 
   @@index([name])
   @@index([technicianId])
   @@index([status])
   @@index([assignmentMode])
   @@map("repairs")
+}
+
+model RepairStatusHistory {
+  id              String       @id @default(uuid()) @db.Uuid
+  repairId        String       @db.Uuid
+  status          RepairStatus
+  changedAt       DateTime     @default(now()) @db.Timestamp(3)
+  changedByUserId String?      @db.Uuid
+  changedByName   String       @db.VarChar(100)
+  changedByRole   HistoryActorRole?
+  comment         String?
+  repair          Repair       @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  changedByUser   User?        @relation(fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([repairId, changedAt])
+  @@index([changedByUserId])
+  @@map("repair_status_history")
 }
 
 model Session {

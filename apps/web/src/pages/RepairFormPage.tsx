@@ -23,6 +23,7 @@ import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router';
 
+import { PhoneField } from '../components/PhoneField';
 import { useGetTechniciansQuery } from '../features/employees/api/employeesApi';
 import { getApiErrorMessage } from '../features/inventory/getApiErrorMessage';
 import {
@@ -128,6 +129,7 @@ export const RepairFormPage = () => {
           label="Наименование"
           error={Boolean(errors.name)}
           helperText={errors.name?.message}
+          slotProps={{ htmlInput: { maxLength: 150 } }}
           {...register('name')}
         />
 
@@ -137,6 +139,7 @@ export const RepairFormPage = () => {
           minRows={4}
           error={Boolean(errors.description)}
           helperText={errors.description?.message}
+          slotProps={{ htmlInput: { maxLength: 2_000 } }}
           {...register('description')}
         />
 
@@ -163,28 +166,32 @@ export const RepairFormPage = () => {
           )}
         />
 
-        <TextField
-          label="Телефон"
-          error={Boolean(errors.customerPhone)}
-          helperText={errors.customerPhone?.message}
-          slotProps={{ htmlInput: { maxLength: 30, inputMode: 'tel' } }}
-          {...register('customerPhone')}
-        />
-
         {customerType === 'LEGAL_ENTITY' && (
           <>
             <TextField
               label="Название компании"
               error={Boolean(errors.companyName)}
               helperText={errors.companyName?.message}
+              slotProps={{ htmlInput: { maxLength: 150 } }}
               {...register('companyName')}
             />
-            <TextField
-              label="ИНН"
-              error={Boolean(errors.inn)}
-              helperText={errors.inn?.message}
-              slotProps={{ htmlInput: { maxLength: 12, inputMode: 'numeric' } }}
-              {...register('inn')}
+            <Controller
+              name="inn"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  label="ИНН"
+                  value={field.value}
+                  onChange={(event) => field.onChange(
+                    event.target.value.replace(/\D/g, '').slice(0, 12),
+                  )}
+                  onBlur={field.onBlur}
+                  name={field.name}
+                  error={Boolean(errors.inn)}
+                  helperText={errors.inn?.message}
+                  slotProps={{ htmlInput: { maxLength: 12, inputMode: 'numeric' } }}
+                />
+              )}
             />
             <Typography component="h3" variant="h6">
               Контактное лицо
@@ -203,21 +210,40 @@ export const RepairFormPage = () => {
             label="Фамилия"
             error={Boolean(errors.customerLastName)}
             helperText={errors.customerLastName?.message}
+            slotProps={{ htmlInput: { maxLength: 100 } }}
             {...register('customerLastName')}
           />
           <TextField
             label="Имя"
             error={Boolean(errors.customerFirstName)}
             helperText={errors.customerFirstName?.message}
+            slotProps={{ htmlInput: { maxLength: 100 } }}
             {...register('customerFirstName')}
           />
           <TextField
             label="Отчество (необязательно)"
             error={Boolean(errors.customerMiddleName)}
             helperText={errors.customerMiddleName?.message}
+            slotProps={{ htmlInput: { maxLength: 100 } }}
             {...register('customerMiddleName')}
           />
         </Box>
+
+        <Controller
+          name="customerPhone"
+          control={control}
+          render={({ field }) => (
+            <PhoneField
+              label="Телефон заказчика"
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              name={field.name}
+              error={Boolean(errors.customerPhone)}
+              helperText={errors.customerPhone?.message}
+            />
+          )}
+        />
 
         <Controller
           name="technicianId"
@@ -228,10 +254,12 @@ export const RepairFormPage = () => {
               <Select
                 labelId="repair-technician-label"
                 label="Ответственный сотрудник"
-                value={field.value ?? ''}
-                onChange={(event) => field.onChange(event.target.value || null)}
+                value={field.value ?? 'FREE_QUEUE'}
+                onChange={(event) => field.onChange(
+                  event.target.value === 'FREE_QUEUE' ? null : event.target.value,
+                )}
               >
-                <MenuItem value="">Свободная касса</MenuItem>
+                <MenuItem value="FREE_QUEUE">Свободная касса</MenuItem>
                 {technicians?.employees.map((employee) => (
                   <MenuItem key={employee.id} value={employee.id}>
                     {employee.name}

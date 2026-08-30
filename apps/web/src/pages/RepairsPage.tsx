@@ -113,6 +113,7 @@ export const RepairsPage = () => {
               onChange={(event) => setSearch(event.target.value)}
               fullWidth
               size="small"
+              slotProps={{ htmlInput: { maxLength: 200 } }}
             />
             <Button type="submit" variant="contained" disabled={isFetching}>
               Поиск

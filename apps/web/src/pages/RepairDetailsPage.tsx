@@ -12,12 +12,14 @@ import {
   Paper,
   Select,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { useGetSessionQuery } from '../app/api';
+import { formatRussianPhone } from '../components/PhoneField';
 import { getApiErrorMessage } from '../features/inventory/getApiErrorMessage';
 import {
   useDeleteRepairMutation,
@@ -55,6 +57,7 @@ export const RepairDetailsPage = () => {
   const [updateStatus, statusState] = useUpdateRepairStatusMutation();
   const [deleteRepair, deleteState] = useDeleteRepairMutation();
   const [selectedStatus, setSelectedStatus] = useState<RepairStatus>('CREATED');
+  const [statusComment, setStatusComment] = useState('');
   const [actionError, setActionError] = useState<string>();
   const role = session?.user.role;
   const canManage = role === 'ADMIN' || role === 'MANAGER';
@@ -88,7 +91,11 @@ export const RepairDetailsPage = () => {
     if (!id) return;
     setActionError(undefined);
     try {
-      await updateStatus({ id, body: { status: selectedStatus } }).unwrap();
+      await updateStatus({
+        id,
+        body: { status: selectedStatus, comment: statusComment },
+      }).unwrap();
+      setStatusComment('');
     } catch (error) {
       setActionError(getApiErrorMessage(error, 'Не удалось изменить статус'));
     }
@@ -171,7 +178,6 @@ export const RepairDetailsPage = () => {
 
       <Paper variant="outlined" sx={{ p: 3 }}>
         <Stack spacing={3}>
-          <Typography component="h2" variant="h5">Ремонт</Typography>
           <Box
             component="dl"
             sx={{
@@ -211,7 +217,7 @@ export const RepairDetailsPage = () => {
             <DetailField label="Тип">
               {repair.customerType === 'INDIVIDUAL' ? 'Физ. лицо' : 'Юр. лицо'}
             </DetailField>
-            <DetailField label="Телефон">{repair.customerPhone}</DetailField>
+            <DetailField label="Телефон">{formatRussianPhone(repair.customerPhone)}</DetailField>
             {repair.customerType === 'LEGAL_ENTITY' && (
               <>
                 <DetailField label="Название компании">{repair.companyName}</DetailField>
@@ -229,31 +235,73 @@ export const RepairDetailsPage = () => {
         <Stack spacing={2}>
           <Typography component="h2" variant="h5">Статус</Typography>
           {canChangeStatus ? (
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <FormControl sx={{ minWidth: 240 }}>
-                <InputLabel id="repair-card-status-label">Статус</InputLabel>
-                <Select
-                  labelId="repair-card-status-label"
-                  label="Статус"
-                  value={selectedStatus}
-                  onChange={(event) => setSelectedStatus(event.target.value as RepairStatus)}
+            <Stack spacing={2}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <FormControl sx={{ minWidth: 240 }}>
+                  <InputLabel id="repair-card-status-label">Статус</InputLabel>
+                  <Select
+                    labelId="repair-card-status-label"
+                    label="Статус"
+                    value={selectedStatus}
+                    onChange={(event) => setSelectedStatus(event.target.value as RepairStatus)}
+                  >
+                    {repairStatuses.map(([value, label]) => (
+                      <MenuItem key={value} value={value}>{label}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Button
+                  variant="contained"
+                  onClick={handleStatusUpdate}
+                  disabled={statusState.isLoading || selectedStatus === repair.status}
                 >
-                  {repairStatuses.map(([value, label]) => (
-                    <MenuItem key={value} value={value}>{label}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <Button
-                variant="contained"
-                onClick={handleStatusUpdate}
-                disabled={statusState.isLoading || selectedStatus === repair.status}
-              >
-                Сохранить статус
-              </Button>
+                  Сохранить статус
+                </Button>
+              </Stack>
+              <TextField
+                label="Комментарий к статусу (необязательно)"
+                value={statusComment}
+                onChange={(event) => setStatusComment(event.target.value)}
+                multiline
+                minRows={3}
+                slotProps={{ htmlInput: { maxLength: 1_000 } }}
+                helperText={`${statusComment.length}/1000`}
+              />
             </Stack>
           ) : (
             <Chip label={repairStatusLabels[repair.status]} sx={{ alignSelf: 'flex-start' }} />
           )}
+
+          <Typography component="h3" variant="h6" sx={{ pt: 1 }}>
+            История статусов
+          </Typography>
+          <Stack spacing={0}>
+            {repair.statusHistory.map((entry) => (
+              <Box
+                key={entry.id}
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    md: 'minmax(140px, 0.7fr) minmax(150px, 0.8fr) minmax(160px, 1fr) 2fr',
+                  },
+                  gap: 2,
+                  py: 2,
+                  borderTop: 1,
+                  borderColor: 'divider',
+                }}
+              >
+                <Typography>{repairStatusLabels[entry.status]}</Typography>
+                <Typography color="text.secondary">
+                  {dateTimeFormatter.format(new Date(entry.changedAt))}
+                </Typography>
+                <Typography>{entry.changedByName}</Typography>
+                <Typography color={entry.comment ? 'text.primary' : 'text.secondary'}>
+                  {entry.comment || 'Нет комментария'}
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
         </Stack>
       </Paper>
 

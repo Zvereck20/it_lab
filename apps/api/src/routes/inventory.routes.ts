@@ -101,11 +101,11 @@ inventoryRouter.use(requireAuth);
 inventoryRouter.get('/categories', async (_request, response) => {
   const [mainCategories, additionalCategories] = await Promise.all([
     prisma.mainCategory.findMany({
-      orderBy: { name: 'asc' },
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
       select: { id: true, name: true },
     }),
     prisma.additionalCategory.findMany({
-      orderBy: { name: 'asc' },
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
       select: {
         id: true,
         name: true,
@@ -398,7 +398,7 @@ inventoryRouter.get('/items', async (request, response) => {
   const [items, total] = await Promise.all([
     prisma.inventoryItem.findMany({
       where,
-      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
       skip: (page - 1) * INVENTORY_PAGE_SIZE,
       take: INVENTORY_PAGE_SIZE,
       select: inventoryItemSelect,

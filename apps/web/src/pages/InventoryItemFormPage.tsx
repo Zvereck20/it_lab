@@ -141,6 +141,7 @@ export const InventoryItemFormPage = () => {
           label="Наименование"
           error={Boolean(errors.name)}
           helperText={errors.name?.message}
+          slotProps={{ htmlInput: { maxLength: 150 } }}
           {...register('name')}
         />
 
@@ -150,6 +151,7 @@ export const InventoryItemFormPage = () => {
           minRows={4}
           error={Boolean(errors.description)}
           helperText={errors.description?.message}
+          slotProps={{ htmlInput: { maxLength: 2_000 } }}
           {...register('description')}
         />
 
