@@ -124,6 +124,7 @@ export const WarehousePage = () => {
               onChange={(event) => setSearch(event.target.value)}
               fullWidth
               size="small"
+              slotProps={{ htmlInput: { maxLength: 200 } }}
             />
             <Button type="submit" variant="contained" disabled={isFetching}>
               Поиск
@@ -215,7 +216,9 @@ export const WarehousePage = () => {
                   </TableCell>
                   <TableCell align="right">{item.count}</TableCell>
                   <TableCell>{item.mainCategory.name}</TableCell>
-                  <TableCell>{item.additionalCategory?.name ?? '—'}</TableCell>
+                  <TableCell>
+                    {item.additionalCategories.map((category) => category.name).join(', ') || '—'}
+                  </TableCell>
                   {canManageItems && (
                     <TableCell align="right">
                       <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>

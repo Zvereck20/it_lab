@@ -14,10 +14,27 @@ enum Role {
 
 enum RepairStatus {
   CREATED
+  DIAGNOSTICS
+  APPROVAL
   IN_PROGRESS
-  REVIEW
   REVISION
   COMPLETED
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  LEGAL_ENTITY
+}
+
+enum RepairAssignmentMode {
+  FREE_QUEUE
+  ASSIGNED
+}
+
+enum HistoryActorRole {
+  ADMIN
+  MANAGER
+  TECHNICIAN
 }
 
 model User {
@@ -30,26 +47,52 @@ model User {
   createdAt    DateTime @default(now()) @db.Timestamp(3)
   updatedAt    DateTime @updatedAt @db.Timestamp(3)
   repairs      Repair[]
+  statusChanges RepairStatusHistory[]
 
   @@map("users")
 }
 
 model Repair {
-  id           String       @id @default(uuid()) @db.Uuid
-  name         String       @db.VarChar(150)
-  description  String?
-  technicianId String?      @db.Uuid
-  dueDate      DateTime     @db.Date
-  status       RepairStatus @default(CREATED)
-  createdAt    DateTime     @default(now()) @db.Timestamp(3)
-  updatedAt    DateTime     @updatedAt @db.Timestamp(3)
-  technician   User?        @relation(fields: [technicianId], references: [id], onDelete: Restrict)
+  id                 String               @id @default(uuid()) @db.Uuid
+  name               String               @db.VarChar(150)
+  description        String?
+  customerType       CustomerType         @default(INDIVIDUAL)
+  customerPhone      String               @db.VarChar(30)
+  customerFirstName  String               @db.VarChar(100)
+  customerLastName   String               @db.VarChar(100)
+  customerMiddleName String?              @db.VarChar(100)
+  companyName        String?              @db.VarChar(150)
+  inn                String?              @db.VarChar(12)
+  assignmentMode     RepairAssignmentMode @default(FREE_QUEUE)
+  technicianId       String?              @db.Uuid
+  status             RepairStatus         @default(CREATED)
+  createdAt          DateTime             @default(now()) @db.Timestamp(3)
+  updatedAt          DateTime             @updatedAt @db.Timestamp(3)
+  technician         User?                @relation(fields: [technicianId], references: [id], onDelete: Restrict)
+  statusHistory      RepairStatusHistory[]
 
   @@index([name])
   @@index([technicianId])
   @@index([status])
-  @@index([dueDate])
+  @@index([assignmentMode])
   @@map("repairs")
+}
+
+model RepairStatusHistory {
+  id              String       @id @default(uuid()) @db.Uuid
+  repairId        String       @db.Uuid
+  status          RepairStatus
+  changedAt       DateTime     @default(now()) @db.Timestamp(3)
+  changedByUserId String?      @db.Uuid
+  changedByName   String       @db.VarChar(100)
+  changedByRole   HistoryActorRole?
+  comment         String?
+  repair          Repair       @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  changedByUser   User?        @relation(fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([repairId, changedAt])
+  @@index([changedByUserId])
+  @@map("repair_status_history")
 }
 
 model Session {
@@ -78,7 +121,7 @@ model AdditionalCategory {
   createdAt      DateTime                         @default(now()) @db.Timestamp(3)
   updatedAt      DateTime                         @updatedAt @db.Timestamp(3)
   mainCategories MainCategoryAdditionalCategory[]
-  inventoryItems InventoryItem[]
+  inventoryItems InventoryItemAdditionalCategory[]
 
   @@map("additional_categories")
 }
@@ -95,20 +138,28 @@ model MainCategoryAdditionalCategory {
 }
 
 model InventoryItem {
-  id                   String              @id @default(uuid()) @db.Uuid
-  name                 String              @db.VarChar(150)
+  id                   String                            @id @default(uuid()) @db.Uuid
+  name                 String                            @db.VarChar(150)
   description          String?
-  count                Int                 @default(0)
-  mainCategoryId       String              @db.Uuid
-  additionalCategoryId String?             @db.Uuid
-  createdAt            DateTime            @default(now()) @db.Timestamp(3)
-  updatedAt            DateTime            @updatedAt @db.Timestamp(3)
-  mainCategory         MainCategory        @relation(fields: [mainCategoryId], references: [id], onDelete: Restrict)
-  additionalCategory   AdditionalCategory? @relation(fields: [additionalCategoryId], references: [id], onDelete: Restrict)
+  count                Int                               @default(0)
+  mainCategoryId       String                            @db.Uuid
+  createdAt            DateTime                          @default(now()) @db.Timestamp(3)
+  updatedAt            DateTime                          @updatedAt @db.Timestamp(3)
+  mainCategory         MainCategory                      @relation(fields: [mainCategoryId], references: [id], onDelete: Restrict)
+  additionalCategories InventoryItemAdditionalCategory[]
 
   @@index([name])
   @@index([mainCategoryId])
-  @@index([additionalCategoryId])
-  @@index([mainCategoryId, additionalCategoryId])
   @@map("inventory_items")
+}
+
+model InventoryItemAdditionalCategory {
+  inventoryItemId     String             @db.Uuid
+  additionalCategoryId String             @db.Uuid
+  inventoryItem       InventoryItem      @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  additionalCategory  AdditionalCategory @relation(fields: [additionalCategoryId], references: [id], onDelete: Restrict)
+
+  @@id([inventoryItemId, additionalCategoryId])
+  @@index([additionalCategoryId])
+  @@map("inventory_item_additional_categories")
 }

@@ -1,5 +1,10 @@
 import type { Prisma } from '../generated/prisma/client.js';
-import { repairInputSchema, repairListQuerySchema } from '@itlab/contracts';
+import type { AuthUser, RepairInput } from '@itlab/contracts';
+import {
+  repairInputSchema,
+  repairListQuerySchema,
+  repairStatusInputSchema,
+} from '@itlab/contracts';
 import { Router } from 'express';
 import { z } from 'zod';
 
@@ -14,8 +19,15 @@ const repairSelect = {
   id: true,
   name: true,
   description: true,
+  customerType: true,
+  customerPhone: true,
+  customerFirstName: true,
+  customerLastName: true,
+  customerMiddleName: true,
+  companyName: true,
+  inn: true,
+  assignmentMode: true,
   technicianId: true,
-  dueDate: true,
   status: true,
   createdAt: true,
   updatedAt: true,
@@ -23,6 +35,53 @@ const repairSelect = {
     select: { id: true, name: true, login: true },
   },
 } satisfies Prisma.RepairSelect;
+
+const repairDetailsSelect = {
+  ...repairSelect,
+  statusHistory: {
+    orderBy: [{ changedAt: 'desc' as const }, { id: 'desc' as const }],
+    select: {
+      id: true,
+      status: true,
+      changedAt: true,
+      changedByUserId: true,
+      changedByName: true,
+      changedByRole: true,
+      comment: true,
+    },
+  },
+} satisfies Prisma.RepairSelect;
+
+type SelectedRepair = {
+  id: string;
+  name: string;
+  description: string | null;
+  customerType: 'INDIVIDUAL' | 'LEGAL_ENTITY';
+  customerPhone: string;
+  customerFirstName: string;
+  customerLastName: string;
+  customerMiddleName: string | null;
+  companyName: string | null;
+  inn: string | null;
+  assignmentMode: 'FREE_QUEUE' | 'ASSIGNED';
+  technicianId: string | null;
+  status: 'CREATED' | 'DIAGNOSTICS' | 'APPROVAL' | 'IN_PROGRESS' | 'REVISION' | 'COMPLETED';
+  createdAt: Date;
+  updatedAt: Date;
+  technician: { id: string; name: string; login: string } | null;
+};
+
+type SelectedRepairDetails = SelectedRepair & {
+  statusHistory: Array<{
+    id: string;
+    status: SelectedRepair['status'];
+    changedAt: Date;
+    changedByUserId: string | null;
+    changedByName: string;
+    changedByRole: 'ADMIN' | 'MANAGER' | 'TECHNICIAN' | null;
+    comment: string | null;
+  }>;
+};
 
 const isPrismaError = (error: unknown, code: string) =>
   Boolean(error && typeof error === 'object' && 'code' in error && error.code === code);
@@ -32,20 +91,20 @@ const validationError = (message = 'Проверьте введённые дан
   message,
 });
 
-const mapRepair = (repair: {
-  id: string;
-  name: string;
-  description: string | null;
-  technicianId: string | null;
-  dueDate: Date;
-  status: 'CREATED' | 'IN_PROGRESS' | 'REVIEW' | 'REVISION' | 'COMPLETED';
-  createdAt: Date;
-  updatedAt: Date;
-  technician: { id: string; name: string; login: string } | null;
-}) => ({
+const mapRepair = (repair: SelectedRepair) => ({
   ...repair,
   description: repair.description ?? '',
-  dueDate: repair.dueDate.toISOString().slice(0, 10),
+  customerMiddleName: repair.customerMiddleName ?? '',
+  companyName: repair.companyName ?? '',
+  inn: repair.inn ?? '',
+});
+
+const mapRepairDetails = (repair: SelectedRepairDetails) => ({
+  ...mapRepair(repair),
+  statusHistory: repair.statusHistory.map((entry) => ({
+    ...entry,
+    comment: entry.comment ?? '',
+  })),
 });
 
 const validateTechnician = async (technicianId: string | null) => {
@@ -62,8 +121,36 @@ const validateTechnician = async (technicianId: string | null) => {
     select: { id: true },
   });
 
-  return technician ? null : 'Ответственный сотрудник не найден или не является техническим специалистом';
+  return technician
+    ? null
+    : 'Ответственный сотрудник не найден или не является техническим специалистом';
 };
+
+const buildRepairData = (input: RepairInput) => ({
+  name: input.name,
+  description: input.description || null,
+  customerType: input.customerType,
+  customerPhone: input.customerPhone,
+  customerFirstName: input.customerFirstName,
+  customerLastName: input.customerLastName,
+  customerMiddleName: input.customerMiddleName || null,
+  companyName: input.customerType === 'LEGAL_ENTITY' ? input.companyName : null,
+  inn: input.customerType === 'LEGAL_ENTITY' ? input.inn : null,
+  assignmentMode: input.technicianId ? 'ASSIGNED' as const : 'FREE_QUEUE' as const,
+  technicianId: input.technicianId,
+});
+
+const buildStatusHistoryData = (
+  user: AuthUser,
+  status: SelectedRepair['status'],
+  comment = '',
+) => ({
+  status,
+  changedByUserId: user.id,
+  changedByName: user.name,
+  changedByRole: user.role,
+  comment: comment || null,
+});
 
 export const repairsRouter = Router();
 
@@ -88,7 +175,9 @@ repairsRouter.get('/', async (request, response) => {
         }
       : {}),
     ...(technicianId
-      ? { technicianId: technicianId === 'unassigned' ? null : technicianId }
+      ? technicianId === 'free_queue'
+        ? { assignmentMode: 'FREE_QUEUE' }
+        : { technicianId }
       : {}),
     ...(status ? { status } : {}),
   };
@@ -96,7 +185,7 @@ repairsRouter.get('/', async (request, response) => {
   const [repairs, total] = await Promise.all([
     prisma.repair.findMany({
       where,
-      orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
       skip: (page - 1) * REPAIR_PAGE_SIZE,
       take: REPAIR_PAGE_SIZE,
       select: repairSelect,
@@ -125,7 +214,7 @@ repairsRouter.get('/:id', async (request, response) => {
 
   const repair = await prisma.repair.findUnique({
     where: { id: parsedId.data },
-    select: repairSelect,
+    select: repairDetailsSelect,
   });
 
   if (!repair) {
@@ -133,7 +222,7 @@ repairsRouter.get('/:id', async (request, response) => {
     return;
   }
 
-  response.json(mapRepair(repair));
+  response.json(mapRepairDetails(repair));
 });
 
 repairsRouter.post('/', allowRoles('MANAGER'), async (request, response) => {
@@ -150,12 +239,18 @@ repairsRouter.post('/', allowRoles('MANAGER'), async (request, response) => {
     return;
   }
 
+  const user = request.session.user;
+  if (!user) {
+    response.status(401).json({ code: 'UNAUTHORIZED', message: 'Требуется авторизация' });
+    return;
+  }
+
   const repair = await prisma.repair.create({
     data: {
-      name: parsedBody.data.name,
-      description: parsedBody.data.description || null,
-      technicianId: parsedBody.data.technicianId,
-      dueDate: new Date(`${parsedBody.data.dueDate}T00:00:00.000Z`),
+      ...buildRepairData(parsedBody.data),
+      statusHistory: {
+        create: buildStatusHistoryData(user, 'CREATED'),
+      },
     },
     select: repairSelect,
   });
@@ -181,15 +276,121 @@ repairsRouter.patch('/:id', allowRoles('MANAGER'), async (request, response) => 
   try {
     const repair = await prisma.repair.update({
       where: { id: parsedId.data },
-      data: {
-        name: parsedBody.data.name,
-        description: parsedBody.data.description || null,
-        technicianId: parsedBody.data.technicianId,
-        dueDate: new Date(`${parsedBody.data.dueDate}T00:00:00.000Z`),
-      },
+      data: buildRepairData(parsedBody.data),
       select: repairSelect,
     });
 
+    response.json(mapRepair(repair));
+  } catch (error) {
+    if (isPrismaError(error, 'P2025')) {
+      response.status(404).json({ code: 'NOT_FOUND', message: 'Ремонт не найден' });
+      return;
+    }
+    throw error;
+  }
+});
+
+repairsRouter.post('/:id/take', allowRoles('TECHNICIAN'), async (request, response) => {
+  const parsedId = idSchema.safeParse(request.params.id);
+  const user = request.session.user;
+
+  if (!parsedId.success) {
+    response.status(400).json(validationError());
+    return;
+  }
+
+  if (user?.role !== 'TECHNICIAN' || !user.id) {
+    response.status(403).json({
+      code: 'FORBIDDEN',
+      message: 'Взять ремонт может только технический специалист',
+    });
+    return;
+  }
+
+  const result = await prisma.repair.updateMany({
+    where: {
+      id: parsedId.data,
+      assignmentMode: 'FREE_QUEUE',
+      technicianId: null,
+    },
+    data: {
+      assignmentMode: 'ASSIGNED',
+      technicianId: user.id,
+    },
+  });
+
+  if (result.count === 0) {
+    response.status(409).json({
+      code: 'REPAIR_ALREADY_ASSIGNED',
+      message: 'Ремонт уже назначен другому сотруднику или не найден',
+    });
+    return;
+  }
+
+  const repair = await prisma.repair.findUniqueOrThrow({
+    where: { id: parsedId.data },
+    select: repairSelect,
+  });
+  response.json(mapRepair(repair));
+});
+
+repairsRouter.patch('/:id/status', allowRoles('MANAGER', 'TECHNICIAN'), async (request, response) => {
+  const parsedId = idSchema.safeParse(request.params.id);
+  const parsedBody = repairStatusInputSchema.safeParse(request.body);
+  const user = request.session.user;
+
+  if (!parsedId.success || !parsedBody.success) {
+    response.status(400).json(validationError());
+    return;
+  }
+
+  if (!user) {
+    response.status(401).json({ code: 'UNAUTHORIZED', message: 'Требуется авторизация' });
+    return;
+  }
+
+  if (user?.role === 'TECHNICIAN') {
+    if (!user.id) {
+      response.status(403).json({
+        code: 'FORBIDDEN',
+        message: 'Не удалось определить сотрудника',
+      });
+      return;
+    }
+
+    const assignedRepair = await prisma.repair.findFirst({
+      where: {
+        id: parsedId.data,
+        assignmentMode: 'ASSIGNED',
+        technicianId: user.id,
+      },
+      select: { id: true },
+    });
+
+    if (!assignedRepair) {
+      response.status(403).json({
+        code: 'FORBIDDEN',
+        message: 'Можно менять статус только назначенного вам ремонта',
+      });
+      return;
+    }
+  }
+
+  try {
+    const repair = await prisma.repair.update({
+      where: { id: parsedId.data },
+      data: {
+        status: parsedBody.data.status,
+        statusHistory: {
+          create: buildStatusHistoryData(
+            user,
+            parsedBody.data.status,
+            parsedBody.data.comment,
+          ),
+        },
+      },
+      select: repairSelect,
+    });
     response.json(mapRepair(repair));
   } catch (error) {
     if (isPrismaError(error, 'P2025')) {

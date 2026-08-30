@@ -47,7 +47,7 @@ employeesRouter.use(requireAuth);
 employeesRouter.get('/technicians', async (_request, response) => {
   const employees = await prisma.user.findMany({
     where: { role: 'TECHNICIAN', isActive: true },
-    orderBy: [{ name: 'asc' }, { login: 'asc' }],
+    orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
     select: employeeSelect,
   });
 
@@ -56,7 +56,7 @@ employeesRouter.get('/technicians', async (_request, response) => {
 
 employeesRouter.get('/', allowRoles('ADMIN'), async (_request, response) => {
   const employees = await prisma.user.findMany({
-    orderBy: [{ name: 'asc' }, { login: 'asc' }],
+    orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
     select: employeeSelect,
   });
 

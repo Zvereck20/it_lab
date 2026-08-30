@@ -1,8 +1,10 @@
 import type {
   Repair,
+  RepairDetails,
   RepairInput,
   RepairListQuery,
   RepairListResponse,
+  RepairStatusInput,
 } from '@itlab/contracts';
 
 import { api } from '../../../app/api';
@@ -18,7 +20,7 @@ export const repairsApi = api.injectEndpoints({
       query: (params) => ({ url: '/repairs', params }),
       providesTags: ['Repairs'],
     }),
-    getRepair: builder.query<Repair, string>({
+    getRepair: builder.query<RepairDetails, string>({
       query: (id) => `/repairs/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'Repairs', id }],
     }),
@@ -28,6 +30,27 @@ export const repairsApi = api.injectEndpoints({
     }),
     updateRepair: builder.mutation<Repair, UpdateRepairRequest>({
       query: ({ id, body }) => ({ url: `/repairs/${id}`, method: 'PATCH', body }),
+      invalidatesTags: (_result, _error, { id }) => [
+        'Repairs',
+        { type: 'Repairs', id },
+      ],
+    }),
+    takeRepair: builder.mutation<Repair, string>({
+      query: (id) => ({ url: `/repairs/${id}/take`, method: 'POST' }),
+      invalidatesTags: (_result, _error, id) => [
+        'Repairs',
+        { type: 'Repairs', id },
+      ],
+    }),
+    updateRepairStatus: builder.mutation<
+      Repair,
+      { id: string; body: RepairStatusInput }
+    >({
+      query: ({ id, body }) => ({
+        url: `/repairs/${id}/status`,
+        method: 'PATCH',
+        body,
+      }),
       invalidatesTags: (_result, _error, { id }) => [
         'Repairs',
         { type: 'Repairs', id },
@@ -45,5 +68,7 @@ export const {
   useGetRepairQuery,
   useCreateRepairMutation,
   useUpdateRepairMutation,
+  useTakeRepairMutation,
+  useUpdateRepairStatusMutation,
   useDeleteRepairMutation,
 } = repairsApi;

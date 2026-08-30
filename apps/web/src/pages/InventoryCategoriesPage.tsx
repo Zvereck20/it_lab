@@ -1,4 +1,8 @@
 import {
+  additionalCategoryInputSchema,
+  mainCategoryInputSchema,
+} from '@itlab/contracts';
+import {
   Alert,
   Box,
   Button,
@@ -70,11 +74,17 @@ export const InventoryCategoriesPage = () => {
     event.preventDefault();
     setActionError(undefined);
 
+    const parsedBody = mainCategoryInputSchema.safeParse({ name: mainName });
+    if (!parsedBody.success) {
+      setActionError(parsedBody.error.issues[0]?.message ?? 'Проверьте название категории');
+      return;
+    }
+
     try {
       if (editingMainId) {
-        await updateMain({ id: editingMainId, body: { name: mainName } }).unwrap();
+        await updateMain({ id: editingMainId, body: parsedBody.data }).unwrap();
       } else {
-        await createMain({ name: mainName }).unwrap();
+        await createMain(parsedBody.data).unwrap();
       }
       resetMainForm();
     } catch (error) {
@@ -86,13 +96,20 @@ export const InventoryCategoriesPage = () => {
     event.preventDefault();
     setActionError(undefined);
 
-    const body = { name: additionalName, mainCategoryIds: additionalMainIds };
+    const parsedBody = additionalCategoryInputSchema.safeParse({
+      name: additionalName,
+      mainCategoryIds: additionalMainIds,
+    });
+    if (!parsedBody.success) {
+      setActionError(parsedBody.error.issues[0]?.message ?? 'Проверьте данные категории');
+      return;
+    }
 
     try {
       if (editingAdditionalId) {
-        await updateAdditional({ id: editingAdditionalId, body }).unwrap();
+        await updateAdditional({ id: editingAdditionalId, body: parsedBody.data }).unwrap();
       } else {
-        await createAdditional(body).unwrap();
+        await createAdditional(parsedBody.data).unwrap();
       }
       resetAdditionalForm();
     } catch (error) {

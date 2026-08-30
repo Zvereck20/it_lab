@@ -10,6 +10,7 @@ import { InventoryCategoriesPage } from './pages/InventoryCategoriesPage';
 import { InventoryItemFormPage } from './pages/InventoryItemFormPage';
 import { LoginPage } from './pages/LoginPage';
 import { RepairFormPage } from './pages/RepairFormPage';
+import { RepairDetailsPage } from './pages/RepairDetailsPage';
 import { RepairsPage } from './pages/RepairsPage';
 import { WarehousePage } from './pages/WarehousePage';
 
@@ -34,6 +35,7 @@ export const App = () => (
           <Route path="/repairs/:id/edit" element={<RepairFormPage />} />
         </Route>
         <Route path="/repairs" element={<RepairsPage />} />
+        <Route path="/repairs/:id" element={<RepairDetailsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Route>

@@ -63,7 +63,6 @@ describe('inventory', () => {
   it('supports dependent categories, server filters and protected deletion', async () => {
     const agent = request.agent(app);
     const suffix = Date.now().toString();
-
     await agent
       .post('/api/auth/login')
       .send({ login: 'BOSS', password: process.env.ADMIN_PASSWORD })
@@ -96,7 +95,7 @@ describe('inventory', () => {
         description: '',
         count: 1,
         mainCategoryId: printersResponse.body.id,
-        additionalCategoryId: null,
+        additionalCategoryIds: [],
       })
       .expect(400);
 
@@ -107,9 +106,10 @@ describe('inventory', () => {
         description: 'Для проверки поиска по описанию',
         count: 12,
         mainCategoryId: printersResponse.body.id,
-        additionalCategoryId: sparePartsResponse.body.id,
+        additionalCategoryIds: [sparePartsResponse.body.id],
       })
       .expect(201);
+    expect(itemResponse.body.additionalCategoryIds).toEqual([sparePartsResponse.body.id]);
 
     const filteredResponse = await agent
       .get('/api/inventory/items')
@@ -152,16 +152,35 @@ describe('employees and repairs', () => {
   it('supports employee CRUD and server-side repair filters', async () => {
     const agent = request.agent(app);
     const suffix = Date.now().toString();
+    const individualCustomer = {
+      customerType: 'INDIVIDUAL',
+      customerPhone: '+79000000000',
+      customerFirstName: 'Иван',
+      customerLastName: 'Иванов',
+      customerMiddleName: '',
+      companyName: '',
+      inn: '',
+    };
 
     await agent
       .post('/api/auth/login')
       .send({ login: 'BOSS', password: process.env.ADMIN_PASSWORD })
       .expect(200);
 
+    await agent
+      .post('/api/employees')
+      .send({
+        name: 'Техник 123',
+        login: `invalid-tech-${suffix}`,
+        password: 'test-password-123',
+        role: 'TECHNICIAN',
+      })
+      .expect(400);
+
     const technicianResponse = await agent
       .post('/api/employees')
       .send({
-        name: `Техник ${suffix}`,
+        name: 'Техник Тестовый',
         login: `tech-${suffix}`,
         password: 'test-password-123',
         role: 'TECHNICIAN',
@@ -173,7 +192,7 @@ describe('employees and repairs', () => {
     const managerResponse = await agent
       .post('/api/employees')
       .send({
-        name: `Менеджер ${suffix}`,
+        name: 'Менеджер Тестовый',
         login: `manager-${suffix}`,
         password: 'test-password-123',
         role: 'MANAGER',
@@ -185,21 +204,44 @@ describe('employees and repairs', () => {
       .send({
         name: `Ремонт без сотрудника ${suffix}`,
         description: 'Проверка необязательного ответственного',
+        ...individualCustomer,
         technicianId: null,
-        dueDate: '2026-09-10',
       })
       .expect(201);
 
     expect(unassignedRepairResponse.body.status).toBe('CREATED');
+    expect(unassignedRepairResponse.body.assignmentMode).toBe('FREE_QUEUE');
     expect(unassignedRepairResponse.body.technician).toBeNull();
+
+    await agent
+      .post('/api/repairs')
+      .send({
+        name: `Ремонт с неверным телефоном ${suffix}`,
+        description: '',
+        ...individualCustomer,
+        customerPhone: '+7 (900) ABC-00-00',
+        technicianId: null,
+      })
+      .expect(400);
+
+    await agent
+      .post('/api/repairs')
+      .send({
+        name: `Ремонт с неверным ФИО ${suffix}`,
+        description: '',
+        ...individualCustomer,
+        customerFirstName: 'Иван123',
+        technicianId: null,
+      })
+      .expect(400);
 
     await agent
       .post('/api/repairs')
       .send({
         name: `Некорректное назначение ${suffix}`,
         description: '',
+        ...individualCustomer,
         technicianId: managerResponse.body.id,
-        dueDate: '2026-09-11',
       })
       .expect(400);
 
@@ -208,10 +250,45 @@ describe('employees and repairs', () => {
       .send({
         name: `Ремонт принтера ${suffix}`,
         description: 'Поиск ремонта по описанию устройства',
+        ...individualCustomer,
         technicianId: technicianResponse.body.id,
-        dueDate: '2026-09-12',
       })
       .expect(201);
+
+    const technicianAgent = request.agent(app);
+    await technicianAgent
+      .post('/api/auth/login')
+      .send({ login: `tech-${suffix}`, password: 'test-password-123' })
+      .expect(200);
+
+    const takenRepairResponse = await technicianAgent
+      .post(`/api/repairs/${unassignedRepairResponse.body.id}/take`)
+      .expect(200);
+    expect(takenRepairResponse.body.assignmentMode).toBe('ASSIGNED');
+    expect(takenRepairResponse.body.technician.id).toBe(technicianResponse.body.id);
+
+    const statusResponse = await technicianAgent
+      .patch(`/api/repairs/${unassignedRepairResponse.body.id}/status`)
+      .send({ status: 'DIAGNOSTICS', comment: 'Устройство передано на диагностику' })
+      .expect(200);
+    expect(statusResponse.body.status).toBe('DIAGNOSTICS');
+
+    const repairDetailsResponse = await technicianAgent
+      .get(`/api/repairs/${unassignedRepairResponse.body.id}`)
+      .expect(200);
+    expect(repairDetailsResponse.body.statusHistory).toHaveLength(2);
+    expect(repairDetailsResponse.body.statusHistory[0].comment)
+      .toBe('Устройство передано на диагностику');
+    expect(repairDetailsResponse.body.statusHistory[0]).toMatchObject({
+      changedByName: 'Техник Тестовый',
+      changedByRole: 'TECHNICIAN',
+    });
+    expect(repairDetailsResponse.body.statusHistory[1]).toMatchObject({
+      status: 'CREATED',
+      changedByName: 'Администратор',
+      changedByRole: 'ADMIN',
+      comment: '',
+    });
 
     const filteredResponse = await agent
       .get('/api/repairs')
@@ -233,7 +310,7 @@ describe('employees and repairs', () => {
     const blockedRoleResponse = await agent
       .patch(`/api/employees/${technicianResponse.body.id}`)
       .send({
-        name: `Техник ${suffix}`,
+        name: 'Техник Тестовый',
         login: `tech-${suffix}`,
         role: 'MANAGER',
       });
@@ -249,8 +326,18 @@ describe('employees and repairs', () => {
       .send({
         name: `Ремонт принтера ${suffix}`,
         description: 'Ответственный снят',
+        ...individualCustomer,
         technicianId: null,
-        dueDate: '2026-09-13',
+      })
+      .expect(200);
+
+    await agent
+      .patch(`/api/repairs/${unassignedRepairResponse.body.id}`)
+      .send({
+        name: `Ремонт без сотрудника ${suffix}`,
+        description: 'Возвращён в свободную кассу',
+        ...individualCustomer,
+        technicianId: null,
       })
       .expect(200);
 
