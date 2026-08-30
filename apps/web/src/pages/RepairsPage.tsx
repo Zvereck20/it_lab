@@ -37,6 +37,18 @@ const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {
   minute: '2-digit',
 });
 
+const getCustomerName = (repair: {
+  customerType: 'INDIVIDUAL' | 'LEGAL_ENTITY';
+  customerFirstName: string;
+  customerLastName: string;
+  customerMiddleName: string;
+  companyName: string;
+}) => repair.customerType === 'LEGAL_ENTITY'
+  ? repair.companyName || '—'
+  : [repair.customerLastName, repair.customerFirstName, repair.customerMiddleName]
+    .filter(Boolean)
+    .join(' ') || '—';
+
 export const RepairsPage = () => {
   const navigate = useNavigate();
   const { data: session } = useGetSessionQuery();
@@ -181,7 +193,7 @@ export const RepairsPage = () => {
           <TableHead>
             <TableRow>
               <TableCell>Наименование</TableCell>
-              <TableCell>Описание</TableCell>
+              <TableCell>Заказчик</TableCell>
               <TableCell>Ответственный</TableCell>
               <TableCell>Дата создания</TableCell>
             </TableRow>
@@ -205,17 +217,7 @@ export const RepairsPage = () => {
                   sx={{ cursor: 'pointer' }}
                 >
                   <TableCell>{repair.name}</TableCell>
-                  <TableCell
-                    title={repair.description}
-                    sx={{
-                      maxWidth: 380,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {repair.description || '—'}
-                  </TableCell>
+                  <TableCell>{getCustomerName(repair)}</TableCell>
                   <TableCell>
                     {repair.assignmentMode === 'FREE_QUEUE'
                       ? 'Свободная касса'

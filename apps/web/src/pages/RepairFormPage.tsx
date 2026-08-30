@@ -45,6 +45,9 @@ const emptyRepair: RepairInput = {
   technicianId: null,
 };
 
+const sanitizePersonName = (value: string) =>
+  value.replace(/[^\p{L} '\-]/gu, '').slice(0, 100);
+
 export const RepairFormPage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -206,27 +209,29 @@ export const RepairFormPage = () => {
             gap: 2,
           }}
         >
-          <TextField
-            label="Фамилия"
-            error={Boolean(errors.customerLastName)}
-            helperText={errors.customerLastName?.message}
-            slotProps={{ htmlInput: { maxLength: 100 } }}
-            {...register('customerLastName')}
-          />
-          <TextField
-            label="Имя"
-            error={Boolean(errors.customerFirstName)}
-            helperText={errors.customerFirstName?.message}
-            slotProps={{ htmlInput: { maxLength: 100 } }}
-            {...register('customerFirstName')}
-          />
-          <TextField
-            label="Отчество (необязательно)"
-            error={Boolean(errors.customerMiddleName)}
-            helperText={errors.customerMiddleName?.message}
-            slotProps={{ htmlInput: { maxLength: 100 } }}
-            {...register('customerMiddleName')}
-          />
+          {([
+            ['customerLastName', 'Фамилия'],
+            ['customerFirstName', 'Имя'],
+            ['customerMiddleName', 'Отчество (необязательно)'],
+          ] as const).map(([fieldName, label]) => (
+            <Controller
+              key={fieldName}
+              name={fieldName}
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  label={label}
+                  value={field.value}
+                  onChange={(event) => field.onChange(sanitizePersonName(event.target.value))}
+                  onBlur={field.onBlur}
+                  name={field.name}
+                  error={Boolean(errors[fieldName])}
+                  helperText={errors[fieldName]?.message}
+                  slotProps={{ htmlInput: { maxLength: 100 } }}
+                />
+              )}
+            />
+          ))}
         </Box>
 
         <Controller

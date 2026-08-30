@@ -227,6 +227,17 @@ describe('employees and repairs', () => {
     await agent
       .post('/api/repairs')
       .send({
+        name: `Ремонт с неверным ФИО ${suffix}`,
+        description: '',
+        ...individualCustomer,
+        customerFirstName: 'Иван123',
+        technicianId: null,
+      })
+      .expect(400);
+
+    await agent
+      .post('/api/repairs')
+      .send({
         name: `Некорректное назначение ${suffix}`,
         description: '',
         ...individualCustomer,
