@@ -19,6 +19,7 @@ const navigationItems = [
   { label: 'Задачи', path: '/', end: true },
   { label: 'Склад', path: '/warehouse' },
   { label: 'Ремонт', path: '/repairs' },
+  { label: 'Заказы', path: '/orders' },
 ];
 
 const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', {

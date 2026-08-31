@@ -377,3 +377,148 @@ export const repairListResponseSchema = z.object({
 });
 
 export type RepairListResponse = z.infer<typeof repairListResponseSchema>;
+
+export const orderStatusSchema = z.enum([
+  'CREATED',
+  'DIAGNOSTICS',
+  'APPROVAL',
+  'IN_PROGRESS',
+  'REVISION',
+  'COMPLETED',
+]);
+
+export type OrderStatus = z.infer<typeof orderStatusSchema>;
+
+export const orderAssignmentModeSchema = z.enum(['FREE_QUEUE', 'ASSIGNED']);
+
+export type OrderAssignmentMode = z.infer<typeof orderAssignmentModeSchema>;
+
+export const orderCategoriesResponseSchema = inventoryCategoriesResponseSchema;
+
+export type OrderCategoriesResponse = z.infer<typeof orderCategoriesResponseSchema>;
+
+const orderBaseInputSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Введите наименование заказа')
+    .max(150, 'Наименование не должно превышать 150 символов')
+    .regex(
+      /^[\p{L}\p{N}][^\r\n]*$/u,
+      'Наименование содержит недопустимые символы',
+    ),
+  description: z
+    .string()
+    .trim()
+    .max(2_000, 'Описание не должно превышать 2000 символов'),
+  companyName: z
+    .string()
+    .trim()
+    .min(1, 'Введите название компании')
+    .max(150, 'Название не должно превышать 150 символов')
+    .regex(/^[\p{L}\p{N}][^\r\n]*$/u, 'Название компании содержит недопустимые символы'),
+  inn: z
+    .string()
+    .trim()
+    .regex(/^\d{10}(\d{2})?$/, 'ИНН должен содержать 10 или 12 цифр'),
+  customerPhone: z
+    .string()
+    .trim()
+    .regex(/^\+7\d{10}$/, 'Введите номер в формате +7 (___) ___-__-__'),
+  contactFirstName: customerNameSchema,
+  contactLastName: customerNameSchema,
+  contactMiddleName: customerNameSchema,
+  mainCategoryId: z.string().uuid('Выберите основную категорию'),
+  additionalCategoryIds: z
+    .array(z.string().uuid())
+    .min(1, 'Выберите хотя бы одну дополнительную категорию')
+    .refine(
+      (items) => new Set(items).size === items.length,
+      'Дополнительные категории не должны повторяться',
+    ),
+  technicianId: z.string().uuid('Выберите сотрудника').nullable(),
+});
+
+export const orderInputSchema = orderBaseInputSchema.superRefine((value, context) => {
+  if (!value.contactFirstName) {
+    context.addIssue({
+      code: 'custom',
+      path: ['contactFirstName'],
+      message: 'Введите имя контактного лица',
+    });
+  }
+
+  if (!value.contactLastName) {
+    context.addIssue({
+      code: 'custom',
+      path: ['contactLastName'],
+      message: 'Введите фамилию контактного лица',
+    });
+  }
+});
+
+export type OrderInput = z.infer<typeof orderInputSchema>;
+
+export const orderSchema = orderBaseInputSchema.extend({
+  id: z.string().uuid(),
+  status: orderStatusSchema,
+  assignmentMode: orderAssignmentModeSchema,
+  mainCategory: mainCategorySchema,
+  additionalCategories: z.array(mainCategorySchema),
+  technician: repairTechnicianSchema.nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export type Order = z.infer<typeof orderSchema>;
+
+export const orderStatusInputSchema = z.object({
+  status: orderStatusSchema,
+  comment: z
+    .string()
+    .trim()
+    .max(1_000, 'Комментарий не должен превышать 1000 символов'),
+});
+
+export type OrderStatusInput = z.infer<typeof orderStatusInputSchema>;
+
+export const orderStatusHistorySchema = z.object({
+  id: z.string().uuid(),
+  status: orderStatusSchema,
+  changedAt: z.string().datetime(),
+  changedByUserId: z.string().uuid().nullable(),
+  changedByName: z.string(),
+  changedByRole: authRoleSchema.nullable(),
+  comment: z.string(),
+});
+
+export type OrderStatusHistory = z.infer<typeof orderStatusHistorySchema>;
+
+export const orderDetailsSchema = orderSchema.extend({
+  statusHistory: z.array(orderStatusHistorySchema),
+});
+
+export type OrderDetails = z.infer<typeof orderDetailsSchema>;
+
+export const orderListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  search: z.string().trim().max(200).optional(),
+  mainCategoryId: z.string().uuid().optional(),
+  additionalCategoryId: z.string().uuid().optional(),
+  technicianId: z.union([z.string().uuid(), z.literal('free_queue')]).optional(),
+  status: orderStatusSchema.optional(),
+});
+
+export type OrderListQuery = z.infer<typeof orderListQuerySchema>;
+
+export const orderListResponseSchema = z.object({
+  items: z.array(orderSchema),
+  pagination: z.object({
+    page: z.number().int(),
+    limit: z.literal(50),
+    total: z.number().int(),
+    totalPages: z.number().int(),
+  }),
+});
+
+export type OrderListResponse = z.infer<typeof orderListResponseSchema>;
