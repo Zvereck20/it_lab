@@ -9,6 +9,10 @@ import { HomePage } from './pages/HomePage';
 import { InventoryCategoriesPage } from './pages/InventoryCategoriesPage';
 import { InventoryItemFormPage } from './pages/InventoryItemFormPage';
 import { LoginPage } from './pages/LoginPage';
+import { OrderCategoriesPage } from './pages/OrderCategoriesPage';
+import { OrderDetailsPage } from './pages/OrderDetailsPage';
+import { OrderFormPage } from './pages/OrderFormPage';
+import { OrdersPage } from './pages/OrdersPage';
 import { RepairFormPage } from './pages/RepairFormPage';
 import { RepairDetailsPage } from './pages/RepairDetailsPage';
 import { RepairsPage } from './pages/RepairsPage';
@@ -26,6 +30,7 @@ export const App = () => (
         <Route path="/warehouse" element={<WarehousePage />} />
         <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
           <Route path="/warehouse/categories" element={<InventoryCategoriesPage />} />
+          <Route path="/orders/categories" element={<OrderCategoriesPage />} />
           <Route path="/employees" element={<EmployeesPage />} />
         </Route>
         <Route element={<RoleRoute allowedRoles={['ADMIN', 'MANAGER']} />}>
@@ -33,9 +38,13 @@ export const App = () => (
           <Route path="/warehouse/:id/edit" element={<InventoryItemFormPage />} />
           <Route path="/repairs/new" element={<RepairFormPage />} />
           <Route path="/repairs/:id/edit" element={<RepairFormPage />} />
+          <Route path="/orders/new" element={<OrderFormPage />} />
+          <Route path="/orders/:id/edit" element={<OrderFormPage />} />
         </Route>
         <Route path="/repairs" element={<RepairsPage />} />
         <Route path="/repairs/:id" element={<RepairDetailsPage />} />
+        <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/orders/:id" element={<OrderDetailsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Route>

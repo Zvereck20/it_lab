@@ -18,6 +18,8 @@ export const api = createApi({
     'Employees',
     'Technicians',
     'Repairs',
+    'Orders',
+    'OrderCategories',
   ],
   endpoints: (builder) => ({
     getHealth: builder.query<HealthResponse, void>({

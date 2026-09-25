@@ -348,6 +348,130 @@ describe('employees and repairs', () => {
   });
 });
 
+describe('orders', () => {
+  it('supports order categories, filters, free queue and status history', async () => {
+    const agent = request.agent(app);
+    const suffix = Date.now().toString();
+    await agent
+      .post('/api/auth/login')
+      .send({ login: 'BOSS', password: process.env.ADMIN_PASSWORD })
+      .expect(200);
+
+    const mainCategoryResponse = await agent
+      .post('/api/orders/categories/main')
+      .send({ name: `Оргтехника ${suffix}` })
+      .expect(201);
+    const otherMainCategoryResponse = await agent
+      .post('/api/orders/categories/main')
+      .send({ name: `Прочее ${suffix}` })
+      .expect(201);
+    const additionalCategoryResponse = await agent
+      .post('/api/orders/categories/additional')
+      .send({
+        name: `Поставка ${suffix}`,
+        mainCategoryIds: [mainCategoryResponse.body.id],
+      })
+      .expect(201);
+    const technicianResponse = await agent
+      .post('/api/employees')
+      .send({
+        name: 'Техник Заказов',
+        login: `order-tech-${suffix}`,
+        password: 'test-password-123',
+        role: 'TECHNICIAN',
+      })
+      .expect(201);
+
+    const orderBody = {
+      name: `Заказ принтера ${suffix}`,
+      description: 'Поставка нового офисного принтера',
+      companyName: `ООО Ромашка ${suffix}`,
+      inn: '1234567890',
+      customerPhone: '+79001234567',
+      contactFirstName: 'Иван',
+      contactLastName: 'Иванов',
+      contactMiddleName: '',
+      mainCategoryId: mainCategoryResponse.body.id,
+      additionalCategoryIds: [additionalCategoryResponse.body.id],
+      technicianId: null,
+    };
+
+    await agent
+      .post('/api/orders')
+      .send({ ...orderBody, mainCategoryId: otherMainCategoryResponse.body.id })
+      .expect(400);
+
+    const orderResponse = await agent
+      .post('/api/orders')
+      .send(orderBody)
+      .expect(201);
+    expect(orderResponse.body).toMatchObject({
+      status: 'CREATED',
+      assignmentMode: 'FREE_QUEUE',
+      additionalCategoryIds: [additionalCategoryResponse.body.id],
+    });
+
+    const filteredResponse = await agent
+      .get('/api/orders')
+      .query({
+        page: 1,
+        search: 'Ромашка',
+        mainCategoryId: mainCategoryResponse.body.id,
+        additionalCategoryId: additionalCategoryResponse.body.id,
+        technicianId: 'free_queue',
+        status: 'CREATED',
+      })
+      .expect(200);
+    expect(filteredResponse.body.pagination).toMatchObject({
+      page: 1,
+      limit: 50,
+      total: 1,
+      totalPages: 1,
+    });
+
+    await agent
+      .delete(`/api/orders/categories/additional/${additionalCategoryResponse.body.id}`)
+      .expect(409);
+
+    const technicianAgent = request.agent(app);
+    await technicianAgent
+      .post('/api/auth/login')
+      .send({ login: `order-tech-${suffix}`, password: 'test-password-123' })
+      .expect(200);
+    await technicianAgent
+      .post(`/api/orders/${orderResponse.body.id}/take`)
+      .expect(200);
+    await technicianAgent
+      .patch(`/api/orders/${orderResponse.body.id}/status`)
+      .send({ status: 'DIAGNOSTICS', comment: 'Заказ принят на проверку' })
+      .expect(200);
+
+    const detailsResponse = await agent
+      .get(`/api/orders/${orderResponse.body.id}`)
+      .expect(200);
+    expect(detailsResponse.body.statusHistory).toHaveLength(2);
+    expect(detailsResponse.body.statusHistory[0]).toMatchObject({
+      status: 'DIAGNOSTICS',
+      changedByName: 'Техник Заказов',
+      changedByRole: 'TECHNICIAN',
+      comment: 'Заказ принят на проверку',
+    });
+
+    await agent.delete(`/api/employees/${technicianResponse.body.id}`).expect(409);
+    await agent.delete(`/api/orders/${orderResponse.body.id}`).expect(204);
+    await agent.delete(`/api/employees/${technicianResponse.body.id}`).expect(204);
+    await agent
+      .delete(`/api/orders/categories/additional/${additionalCategoryResponse.body.id}`)
+      .expect(204);
+    await agent
+      .delete(`/api/orders/categories/main/${mainCategoryResponse.body.id}`)
+      .expect(204);
+    await agent
+      .delete(`/api/orders/categories/main/${otherMainCategoryResponse.body.id}`)
+      .expect(204);
+  });
+});
+
 describe('inventory development seed', () => {
   it('creates 100 database items from existing category links without duplicates', async () => {
     const suffix = Date.now().toString();

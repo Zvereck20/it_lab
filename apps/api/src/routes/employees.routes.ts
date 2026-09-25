@@ -37,7 +37,7 @@ const loginConflict = {
 
 const employeeInUse = {
   code: 'EMPLOYEE_IN_USE',
-  message: 'Сотрудник назначен на ремонт. Сначала переназначьте связанные ремонты',
+  message: 'Сотрудник назначен на ремонт или заказ. Сначала переназначьте связанные записи',
 };
 
 export const employeesRouter = Router();
@@ -112,11 +112,12 @@ employeesRouter.patch('/:id', allowRoles('ADMIN'), async (request, response) => 
   }
 
   if (parsedBody.data.role !== 'TECHNICIAN') {
-    const assignedRepairs = await prisma.repair.count({
-      where: { technicianId: parsedId.data },
-    });
+    const [assignedRepairs, assignedOrders] = await Promise.all([
+      prisma.repair.count({ where: { technicianId: parsedId.data } }),
+      prisma.order.count({ where: { technicianId: parsedId.data } }),
+    ]);
 
-    if (assignedRepairs > 0) {
+    if (assignedRepairs > 0 || assignedOrders > 0) {
       response.status(409).json(employeeInUse);
       return;
     }
@@ -158,11 +159,12 @@ employeesRouter.delete('/:id', allowRoles('ADMIN'), async (request, response) =>
     return;
   }
 
-  const assignedRepairs = await prisma.repair.count({
-    where: { technicianId: parsedId.data },
-  });
+  const [assignedRepairs, assignedOrders] = await Promise.all([
+    prisma.repair.count({ where: { technicianId: parsedId.data } }),
+    prisma.order.count({ where: { technicianId: parsedId.data } }),
+  ]);
 
-  if (assignedRepairs > 0) {
+  if (assignedRepairs > 0 || assignedOrders > 0) {
     response.status(409).json(employeeInUse);
     return;
   }
