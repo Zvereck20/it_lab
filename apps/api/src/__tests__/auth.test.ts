@@ -438,13 +438,25 @@ describe('orders', () => {
       .post('/api/auth/login')
       .send({ login: `order-tech-${suffix}`, password: 'test-password-123' })
       .expect(200);
+
+    const unassignedStatusResponse = await technicianAgent
+      .patch(`/api/orders/${orderResponse.body.id}/status`)
+      .send({ status: 'DIAGNOSTICS', comment: 'Попытка изменить свободный заказ' })
+      .expect(403);
+    expect(unassignedStatusResponse.body).toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Можно менять статус только назначенного вам заказа',
+    });
+
     await technicianAgent
       .post(`/api/orders/${orderResponse.body.id}/take`)
       .expect(200);
-    await technicianAgent
+
+    const technicianStatusResponse = await technicianAgent
       .patch(`/api/orders/${orderResponse.body.id}/status`)
       .send({ status: 'DIAGNOSTICS', comment: 'Заказ принят на проверку' })
       .expect(200);
+    expect(technicianStatusResponse.body.status).toBe('DIAGNOSTICS');
 
     const detailsResponse = await agent
       .get(`/api/orders/${orderResponse.body.id}`)
