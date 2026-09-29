@@ -2,6 +2,7 @@ import type { InventoryAllocationTargetOption, InventoryItem } from '@itlab/cont
 import {
   Alert,
   Autocomplete,
+  Box,
   Button,
   Checkbox,
   Dialog,
@@ -33,6 +34,16 @@ interface InventoryAllocationDialogProps {
 
 const targetKey = (target: InventoryAllocationTargetOption) =>
   `${target.type}:${target.id}`;
+
+const formatOrdersCount = (count: number) => {
+  const lastTwoDigits = count % 100;
+  const lastDigit = count % 10;
+
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return `${count} заказов`;
+  if (lastDigit === 1) return `${count} заказ`;
+  if (lastDigit >= 2 && lastDigit <= 4) return `${count} заказа`;
+  return `${count} заказов`;
+};
 
 export const InventoryAllocationDialog = ({
   item,
@@ -89,7 +100,7 @@ export const InventoryAllocationDialog = ({
         },
       }).unwrap();
       onAllocated(
-        `«${item.name}» добавлен в ${result.allocatedTargets} записей. Остаток: ${result.remainingCount}.`,
+        `«${item.name}» добавлен в ${formatOrdersCount(result.allocatedTargets)}. Остаток: ${result.remainingCount}.`,
       );
       onClose();
     } catch (requestError) {
@@ -155,30 +166,49 @@ export const InventoryAllocationDialog = ({
             )}
           />
 
-          {selectedTargets.length > 0 && (
-            <FormGroup>
-              {selectedTargets.map((target) => (
-                <FormControlLabel
-                  key={targetKey(target)}
-                  label={target.number}
-                  control={(
-                    <Checkbox
-                      checked
-                      onChange={() => setSelectedTargets((current) =>
-                        current.filter((item) => targetKey(item) !== targetKey(target)))}
-                    />
-                  )}
-                />
-              ))}
-            </FormGroup>
-          )}
+          <Box
+            sx={{
+              height: 126,
+              overflowY: 'auto',
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: 1,
+              px: 1.5,
+              py: 0.5,
+            }}
+          >
+            {selectedTargets.length > 0 ? (
+              <FormGroup>
+                {selectedTargets.map((target) => (
+                  <FormControlLabel
+                    key={targetKey(target)}
+                    label={target.number}
+                    sx={{ m: 0, minHeight: 38 }}
+                    control={(
+                      <Checkbox
+                        size="small"
+                        checked
+                        onChange={() => setSelectedTargets((current) =>
+                          current.filter((item) => targetKey(item) !== targetKey(target)))}
+                      />
+                    )}
+                  />
+                ))}
+              </FormGroup>
+            ) : (
+              <Box sx={{ height: '100%', display: 'grid', placeItems: 'center' }}>
+                <Typography color="text.secondary">Заказы не выбраны</Typography>
+              </Box>
+            )}
+          </Box>
 
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'flex-start' }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
             <Button
               variant="outlined"
               aria-label="Уменьшить количество"
               onClick={() => setQuantity((current) => Math.max(1, current - 1))}
               disabled={quantity <= 1}
+              sx={{ height: 56, minWidth: 48 }}
             >
               −
             </Button>
@@ -188,9 +218,6 @@ export const InventoryAllocationDialog = ({
               value={quantity}
               onChange={(event) => setQuantity(Number(event.target.value))}
               error={selectedTargets.length > 0 && !quantityIsValid}
-              helperText={selectedTargets.length > 0
-                ? `Допустимо от 1 до ${maximumQuantity}`
-                : 'Сначала выберите заказ или ремонт'}
               fullWidth
               slotProps={{ htmlInput: { min: 1, max: Math.max(1, maximumQuantity), step: 1 } }}
             />
@@ -199,6 +226,7 @@ export const InventoryAllocationDialog = ({
               aria-label="Увеличить количество"
               onClick={() => setQuantity((current) => Math.min(maximumQuantity, current + 1))}
               disabled={maximumQuantity < 1 || quantity >= maximumQuantity}
+              sx={{ height: 56, minWidth: 48 }}
             >
               +
             </Button>

@@ -77,6 +77,16 @@ const validationError = (message = 'Проверьте введённые дан
   message,
 });
 
+const orderVisibilityFilter = (user: AuthUser): Prisma.OrderWhereInput =>
+  user.role === 'TECHNICIAN'
+    ? {
+        OR: [
+          { assignmentMode: 'FREE_QUEUE' },
+          { technicianId: user.id! },
+        ],
+      }
+    : {};
+
 const categoryConflict = {
   code: 'CATEGORY_IN_USE',
   message: 'Категория используется. Сначала удалите или перенесите связанные заказы',
@@ -413,8 +423,17 @@ ordersRouter.delete('/categories/additional/:id', allowRoles('ADMIN'), async (re
 
 ordersRouter.get('/', async (request, response) => {
   const parsedQuery = orderListQuerySchema.safeParse(request.query);
+  const user = request.session.user;
   if (!parsedQuery.success) {
     response.status(400).json(validationError('Некорректные параметры поиска или фильтра'));
+    return;
+  }
+  if (!user) {
+    response.status(401).json({ code: 'UNAUTHORIZED', message: 'Требуется авторизация' });
+    return;
+  }
+  if (user.role === 'TECHNICIAN' && !user.id) {
+    response.status(403).json({ code: 'FORBIDDEN', message: 'Не удалось определить сотрудника' });
     return;
   }
 
@@ -433,26 +452,29 @@ ordersRouter.get('/', async (request, response) => {
   }
 
   const where: Prisma.OrderWhereInput = {
-    ...(search
-      ? {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' as const } },
-            { description: { contains: search, mode: 'insensitive' as const } },
-            { companyName: { contains: search, mode: 'insensitive' as const } },
-            { inn: { contains: search } },
-          ],
-        }
-      : {}),
-    ...(mainCategoryId ? { mainCategoryId } : {}),
-    ...(additionalCategoryId
-      ? { additionalCategories: { some: { additionalCategoryId } } }
-      : {}),
-    ...(technicianId
-      ? technicianId === 'free_queue'
-        ? { assignmentMode: 'FREE_QUEUE' }
-        : { technicianId }
-      : {}),
-    ...(status ? { status } : {}),
+    AND: [
+      orderVisibilityFilter(user),
+      search
+        ? {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' as const } },
+              { description: { contains: search, mode: 'insensitive' as const } },
+              { companyName: { contains: search, mode: 'insensitive' as const } },
+              { inn: { contains: search } },
+            ],
+          }
+        : {},
+      mainCategoryId ? { mainCategoryId } : {},
+      additionalCategoryId
+        ? { additionalCategories: { some: { additionalCategoryId } } }
+        : {},
+      technicianId
+        ? technicianId === 'free_queue'
+          ? { assignmentMode: 'FREE_QUEUE' }
+          : { technicianId }
+        : {},
+      status ? { status } : {},
+    ],
   };
 
   const [orders, total] = await Promise.all([
@@ -479,13 +501,18 @@ ordersRouter.get('/', async (request, response) => {
 
 ordersRouter.get('/:id', async (request, response) => {
   const parsedId = idSchema.safeParse(request.params.id);
+  const user = request.session.user;
   if (!parsedId.success) {
     response.status(400).json(validationError());
     return;
   }
+  if (!user || (user.role === 'TECHNICIAN' && !user.id)) {
+    response.status(403).json({ code: 'FORBIDDEN', message: 'Заказ недоступен' });
+    return;
+  }
 
-  const order = await prisma.order.findUnique({
-    where: { id: parsedId.data },
+  const order = await prisma.order.findFirst({
+    where: { id: parsedId.data, ...orderVisibilityFilter(user) },
     select: orderDetailsSelect,
   });
   if (!order) {

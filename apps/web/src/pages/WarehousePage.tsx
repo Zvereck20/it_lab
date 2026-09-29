@@ -201,7 +201,7 @@ export const WarehousePage = () => {
               <TableCell align="right">Количество</TableCell>
               <TableCell>Основная категория</TableCell>
               <TableCell>Доп. категория</TableCell>
-              {hasItemActions && <TableCell align="right">Действия</TableCell>}
+              {hasItemActions && <TableCell align="center">Действия</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -226,13 +226,22 @@ export const WarehousePage = () => {
                     {item.additionalCategories.map((category) => category.name).join(', ') || '—'}
                   </TableCell>
                   {hasItemActions && (
-                    <TableCell align="right">
-                      <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
+                    <TableCell align="center" sx={{ verticalAlign: 'middle' }}>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                        }}
+                      >
                         {canAllocateItems && (
                           <Button
                             size="small"
                             variant="outlined"
                             disabled={item.count === 0}
+                            sx={{ px: 1, py: 0.25, fontSize: '0.75rem', lineHeight: 1.4 }}
                             onClick={() => {
                               setActionError(undefined);
                               setActionSuccess(undefined);

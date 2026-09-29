@@ -94,6 +94,16 @@ const validationError = (message = 'Проверьте введённые дан
   message,
 });
 
+const repairVisibilityFilter = (user: AuthUser): Prisma.RepairWhereInput =>
+  user.role === 'TECHNICIAN'
+    ? {
+        OR: [
+          { assignmentMode: 'FREE_QUEUE' },
+          { technicianId: user.id! },
+        ],
+      }
+    : {};
+
 const mapRepair = (repair: SelectedRepair) => ({
   ...repair,
   number: formatRepairNumber(repair.number),
@@ -162,28 +172,40 @@ repairsRouter.use(requireAuth);
 
 repairsRouter.get('/', async (request, response) => {
   const parsedQuery = repairListQuerySchema.safeParse(request.query);
+  const user = request.session.user;
 
   if (!parsedQuery.success) {
     response.status(400).json(validationError('Некорректные параметры поиска или фильтра'));
     return;
   }
+  if (!user) {
+    response.status(401).json({ code: 'UNAUTHORIZED', message: 'Требуется авторизация' });
+    return;
+  }
+  if (user.role === 'TECHNICIAN' && !user.id) {
+    response.status(403).json({ code: 'FORBIDDEN', message: 'Не удалось определить сотрудника' });
+    return;
+  }
 
   const { page, search, technicianId, status } = parsedQuery.data;
   const where: Prisma.RepairWhereInput = {
-    ...(search
-      ? {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' as const } },
-            { description: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
-      : {}),
-    ...(technicianId
-      ? technicianId === 'free_queue'
-        ? { assignmentMode: 'FREE_QUEUE' }
-        : { technicianId }
-      : {}),
-    ...(status ? { status } : {}),
+    AND: [
+      repairVisibilityFilter(user),
+      search
+        ? {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' as const } },
+              { description: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {},
+      technicianId
+        ? technicianId === 'free_queue'
+          ? { assignmentMode: 'FREE_QUEUE' }
+          : { technicianId }
+        : {},
+      status ? { status } : {},
+    ],
   };
 
   const [repairs, total] = await Promise.all([
@@ -210,14 +232,19 @@ repairsRouter.get('/', async (request, response) => {
 
 repairsRouter.get('/:id', async (request, response) => {
   const parsedId = idSchema.safeParse(request.params.id);
+  const user = request.session.user;
 
   if (!parsedId.success) {
     response.status(400).json(validationError());
     return;
   }
+  if (!user || (user.role === 'TECHNICIAN' && !user.id)) {
+    response.status(403).json({ code: 'FORBIDDEN', message: 'Ремонт недоступен' });
+    return;
+  }
 
-  const repair = await prisma.repair.findUnique({
-    where: { id: parsedId.data },
+  const repair = await prisma.repair.findFirst({
+    where: { id: parsedId.data, ...repairVisibilityFilter(user) },
     select: repairDetailsSelect,
   });
 

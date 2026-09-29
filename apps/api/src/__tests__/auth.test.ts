@@ -563,6 +563,15 @@ describe('inventory allocations', () => {
         role: 'TECHNICIAN',
       })
       .expect(201);
+    const otherTechnician = await agent
+      .post('/api/employees')
+      .send({
+        name: 'Другой Техник',
+        login: `allocation-other-tech-${suffix}`,
+        password: 'test-password-123',
+        role: 'TECHNICIAN',
+      })
+      .expect(201);
 
     const orderMainCategory = await agent
       .post('/api/orders/categories/main')
@@ -575,20 +584,32 @@ describe('inventory allocations', () => {
         mainCategoryIds: [orderMainCategory.body.id],
       })
       .expect(201);
+    const orderBody = {
+      name: `Заказ распределения ${suffix}`,
+      description: '',
+      companyName: `ООО Распределение ${suffix}`,
+      inn: '1234567890',
+      customerPhone: '+79001234567',
+      contactFirstName: 'Иван',
+      contactLastName: 'Иванов',
+      contactMiddleName: '',
+      mainCategoryId: orderMainCategory.body.id,
+      additionalCategoryIds: [orderAdditionalCategory.body.id],
+    };
     const order = await agent
       .post('/api/orders')
+      .send({ ...orderBody, technicianId: technician.body.id })
+      .expect(201);
+    const freeOrder = await agent
+      .post('/api/orders')
+      .send({ ...orderBody, name: `Свободный заказ ${suffix}`, technicianId: null })
+      .expect(201);
+    const otherOrder = await agent
+      .post('/api/orders')
       .send({
-        name: `Заказ распределения ${suffix}`,
-        description: '',
-        companyName: `ООО Распределение ${suffix}`,
-        inn: '1234567890',
-        customerPhone: '+79001234567',
-        contactFirstName: 'Иван',
-        contactLastName: 'Иванов',
-        contactMiddleName: '',
-        mainCategoryId: orderMainCategory.body.id,
-        additionalCategoryIds: [orderAdditionalCategory.body.id],
-        technicianId: technician.body.id,
+        ...orderBody,
+        name: `Чужой заказ ${suffix}`,
+        technicianId: otherTechnician.body.id,
       })
       .expect(201);
     const repair = await agent
@@ -600,6 +621,24 @@ describe('inventory allocations', () => {
         technicianId: technician.body.id,
       })
       .expect(201);
+    const freeRepair = await agent
+      .post('/api/repairs')
+      .send({
+        name: `Свободный ремонт ${suffix}`,
+        description: '',
+        ...individualCustomer,
+        technicianId: null,
+      })
+      .expect(201);
+    const otherRepair = await agent
+      .post('/api/repairs')
+      .send({
+        name: `Чужой ремонт ${suffix}`,
+        description: '',
+        ...individualCustomer,
+        technicianId: otherTechnician.body.id,
+      })
+      .expect(201);
 
     expect(order.body.number).toMatch(/^З-\d{6}$/u);
     expect(repair.body.number).toMatch(/^Р-\d{6}$/u);
@@ -609,6 +648,26 @@ describe('inventory allocations', () => {
       .post('/api/auth/login')
       .send({ login: `allocation-tech-${suffix}`, password: 'test-password-123' })
       .expect(200);
+
+    const visibleOrders = await technicianAgent
+      .get('/api/orders')
+      .query({ page: 1 })
+      .expect(200);
+    expect(visibleOrders.body.items.map((item: { id: string }) => item.id))
+      .toEqual(expect.arrayContaining([order.body.id, freeOrder.body.id]));
+    expect(visibleOrders.body.items.map((item: { id: string }) => item.id))
+      .not.toContain(otherOrder.body.id);
+    await technicianAgent.get(`/api/orders/${otherOrder.body.id}`).expect(404);
+
+    const visibleRepairs = await technicianAgent
+      .get('/api/repairs')
+      .query({ page: 1 })
+      .expect(200);
+    expect(visibleRepairs.body.items.map((item: { id: string }) => item.id))
+      .toEqual(expect.arrayContaining([repair.body.id, freeRepair.body.id]));
+    expect(visibleRepairs.body.items.map((item: { id: string }) => item.id))
+      .not.toContain(otherRepair.body.id);
+    await technicianAgent.get(`/api/repairs/${otherRepair.body.id}`).expect(404);
 
     const orderSearch = await technicianAgent
       .get('/api/inventory/allocation-targets')
@@ -713,9 +772,14 @@ describe('inventory allocations', () => {
     await prisma.orderComponent.deleteMany({ where: { orderId: order.body.id } });
     await prisma.repairComponent.deleteMany({ where: { repairId: repair.body.id } });
     await agent.delete(`/api/orders/${order.body.id}`).expect(204);
+    await agent.delete(`/api/orders/${freeOrder.body.id}`).expect(204);
+    await agent.delete(`/api/orders/${otherOrder.body.id}`).expect(204);
     await agent.delete(`/api/repairs/${repair.body.id}`).expect(204);
+    await agent.delete(`/api/repairs/${freeRepair.body.id}`).expect(204);
+    await agent.delete(`/api/repairs/${otherRepair.body.id}`).expect(204);
     await agent.delete(`/api/inventory/items/${inventoryItem.body.id}`).expect(204);
     await agent.delete(`/api/employees/${technician.body.id}`).expect(204);
+    await agent.delete(`/api/employees/${otherTechnician.body.id}`).expect(204);
     await agent
       .delete(`/api/orders/categories/additional/${orderAdditionalCategory.body.id}`)
       .expect(204);
