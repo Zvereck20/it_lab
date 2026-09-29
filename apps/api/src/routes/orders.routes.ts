@@ -13,12 +13,14 @@ import { z } from 'zod';
 import { prisma } from '../db/prisma.js';
 import { allowRoles } from '../middlewares/allowRoles.js';
 import { requireAuth } from '../middlewares/requireAuth.js';
+import { formatOrderNumber } from '../utils/workNumber.js';
 
 const ORDER_PAGE_SIZE = 50;
 const idSchema = z.string().uuid();
 
 const orderSelect = {
   id: true,
+  number: true,
   name: true,
   description: true,
   companyName: true,
@@ -87,6 +89,7 @@ const mapOrder = (order: SelectedOrder) => {
 
   return {
     ...order,
+    number: formatOrderNumber(order.number),
     description: order.description ?? '',
     contactMiddleName: order.contactMiddleName ?? '',
     additionalCategoryIds: additionalCategories.map((category) => category.id),
@@ -679,6 +682,13 @@ ordersRouter.delete('/:id', allowRoles('MANAGER'), async (request, response) => 
   } catch (error) {
     if (isPrismaError(error, 'P2025')) {
       response.status(404).json({ code: 'NOT_FOUND', message: 'Заказ не найден' });
+      return;
+    }
+    if (isPrismaError(error, 'P2003')) {
+      response.status(409).json({
+        code: 'ORDER_HAS_COMPONENTS',
+        message: 'Сначала верните добавленные компоненты на склад',
+      });
       return;
     }
     throw error;

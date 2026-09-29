@@ -111,6 +111,35 @@ describe('inventory', () => {
       .expect(201);
     expect(itemResponse.body.additionalCategoryIds).toEqual([sparePartsResponse.body.id]);
 
+    const receiptMovement = await prisma.inventoryMovement.findFirstOrThrow({
+      where: { inventoryItemId: itemResponse.body.id },
+    });
+    expect(receiptMovement).toMatchObject({
+      operationType: 'STOCK_RECEIPT',
+      quantityDelta: 12,
+      performedById: 'ADMIN',
+      performedByName: 'Администратор',
+    });
+
+    await agent
+      .patch(`/api/inventory/items/${itemResponse.body.id}`)
+      .send({
+        name: 'Тестовый картридж',
+        description: 'Для проверки поиска по описанию',
+        count: 9,
+        mainCategoryId: printersResponse.body.id,
+        additionalCategoryIds: [sparePartsResponse.body.id],
+      })
+      .expect(200);
+
+    const decreaseMovement = await prisma.inventoryMovement.findFirstOrThrow({
+      where: {
+        inventoryItemId: itemResponse.body.id,
+        operationType: 'MANUAL_DECREASE',
+      },
+    });
+    expect(decreaseMovement.quantityDelta).toBe(-3);
+
     const filteredResponse = await agent
       .get('/api/inventory/items')
       .query({
@@ -480,6 +509,224 @@ describe('orders', () => {
       .expect(204);
     await agent
       .delete(`/api/orders/categories/main/${otherMainCategoryResponse.body.id}`)
+      .expect(204);
+  });
+});
+
+describe('inventory allocations', () => {
+  it('allocates stock to assigned orders and repairs with an audit trail', async () => {
+    const agent = request.agent(app);
+    const suffix = Date.now().toString();
+    const individualCustomer = {
+      customerType: 'INDIVIDUAL',
+      customerPhone: '+79000000000',
+      customerFirstName: 'Пётр',
+      customerLastName: 'Петров',
+      customerMiddleName: '',
+      companyName: '',
+      inn: '',
+    };
+
+    await agent
+      .post('/api/auth/login')
+      .send({ login: 'BOSS', password: process.env.ADMIN_PASSWORD })
+      .expect(200);
+
+    const inventoryMainCategory = await agent
+      .post('/api/inventory/categories/main')
+      .send({ name: `Компоненты распределения ${suffix}` })
+      .expect(201);
+    const inventoryAdditionalCategory = await agent
+      .post('/api/inventory/categories/additional')
+      .send({
+        name: `Платы распределения ${suffix}`,
+        mainCategoryIds: [inventoryMainCategory.body.id],
+      })
+      .expect(201);
+    const inventoryItem = await agent
+      .post('/api/inventory/items')
+      .send({
+        name: `Тестовая плата ${suffix}`,
+        description: '',
+        count: 20,
+        mainCategoryId: inventoryMainCategory.body.id,
+        additionalCategoryIds: [inventoryAdditionalCategory.body.id],
+      })
+      .expect(201);
+
+    const technician = await agent
+      .post('/api/employees')
+      .send({
+        name: 'Техник Распределения',
+        login: `allocation-tech-${suffix}`,
+        password: 'test-password-123',
+        role: 'TECHNICIAN',
+      })
+      .expect(201);
+
+    const orderMainCategory = await agent
+      .post('/api/orders/categories/main')
+      .send({ name: `Заказы распределения ${suffix}` })
+      .expect(201);
+    const orderAdditionalCategory = await agent
+      .post('/api/orders/categories/additional')
+      .send({
+        name: `Монтаж распределения ${suffix}`,
+        mainCategoryIds: [orderMainCategory.body.id],
+      })
+      .expect(201);
+    const order = await agent
+      .post('/api/orders')
+      .send({
+        name: `Заказ распределения ${suffix}`,
+        description: '',
+        companyName: `ООО Распределение ${suffix}`,
+        inn: '1234567890',
+        customerPhone: '+79001234567',
+        contactFirstName: 'Иван',
+        contactLastName: 'Иванов',
+        contactMiddleName: '',
+        mainCategoryId: orderMainCategory.body.id,
+        additionalCategoryIds: [orderAdditionalCategory.body.id],
+        technicianId: technician.body.id,
+      })
+      .expect(201);
+    const repair = await agent
+      .post('/api/repairs')
+      .send({
+        name: `Ремонт распределения ${suffix}`,
+        description: '',
+        ...individualCustomer,
+        technicianId: technician.body.id,
+      })
+      .expect(201);
+
+    expect(order.body.number).toMatch(/^З-\d{6}$/u);
+    expect(repair.body.number).toMatch(/^Р-\d{6}$/u);
+
+    const technicianAgent = request.agent(app);
+    await technicianAgent
+      .post('/api/auth/login')
+      .send({ login: `allocation-tech-${suffix}`, password: 'test-password-123' })
+      .expect(200);
+
+    const orderSearch = await technicianAgent
+      .get('/api/inventory/allocation-targets')
+      .query({ search: order.body.number })
+      .expect(200);
+    expect(orderSearch.body.items).toEqual([
+      {
+        id: order.body.id,
+        type: 'ORDER',
+        number: order.body.number,
+        disabled: false,
+      },
+    ]);
+
+    const allocationResponse = await technicianAgent
+      .post(`/api/inventory/items/${inventoryItem.body.id}/allocate`)
+      .send({
+        quantity: 3,
+        targets: [
+          { type: 'ORDER', id: order.body.id },
+          { type: 'REPAIR', id: repair.body.id },
+        ],
+      })
+      .expect(200);
+    expect(allocationResponse.body).toEqual({
+      inventoryItemId: inventoryItem.body.id,
+      remainingCount: 14,
+      allocatedTargets: 2,
+    });
+
+    const [orderComponent, repairComponent, allocationMovements] = await Promise.all([
+      prisma.orderComponent.findUniqueOrThrow({
+        where: {
+          orderId_inventoryItemId: {
+            orderId: order.body.id,
+            inventoryItemId: inventoryItem.body.id,
+          },
+        },
+      }),
+      prisma.repairComponent.findUniqueOrThrow({
+        where: {
+          repairId_inventoryItemId: {
+            repairId: repair.body.id,
+            inventoryItemId: inventoryItem.body.id,
+          },
+        },
+      }),
+      prisma.inventoryMovement.findMany({
+        where: {
+          inventoryItemId: inventoryItem.body.id,
+          operationType: { in: ['ORDER_ALLOCATION', 'REPAIR_ALLOCATION'] },
+        },
+      }),
+    ]);
+    expect(orderComponent).toMatchObject({ quantity: 3, nameSnapshot: inventoryItem.body.name });
+    expect(repairComponent).toMatchObject({ quantity: 3, nameSnapshot: inventoryItem.body.name });
+    expect(allocationMovements).toHaveLength(2);
+    expect(allocationMovements).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        operationType: 'ORDER_ALLOCATION',
+        quantityDelta: -3,
+        performedById: technician.body.id,
+        performedByName: 'Техник Распределения',
+      }),
+      expect.objectContaining({
+        operationType: 'REPAIR_ALLOCATION',
+        quantityDelta: -3,
+        performedById: technician.body.id,
+        performedByName: 'Техник Распределения',
+      }),
+    ]));
+
+    const insufficientResponse = await technicianAgent
+      .post(`/api/inventory/items/${inventoryItem.body.id}/allocate`)
+      .send({
+        quantity: 8,
+        targets: [
+          { type: 'ORDER', id: order.body.id },
+          { type: 'REPAIR', id: repair.body.id },
+        ],
+      })
+      .expect(409);
+    expect(insufficientResponse.body.code).toBe('INSUFFICIENT_STOCK');
+
+    await agent
+      .patch(`/api/orders/${order.body.id}/status`)
+      .send({ status: 'COMPLETED', comment: '' })
+      .expect(200);
+
+    const completedOrderSearch = await technicianAgent
+      .get('/api/inventory/allocation-targets')
+      .query({ search: order.body.number })
+      .expect(200);
+    expect(completedOrderSearch.body.items[0].disabled).toBe(true);
+
+    const completedAllocation = await technicianAgent
+      .post(`/api/inventory/items/${inventoryItem.body.id}/allocate`)
+      .send({ quantity: 1, targets: [{ type: 'ORDER', id: order.body.id }] })
+      .expect(409);
+    expect(completedAllocation.body.code).toBe('TARGET_COMPLETED');
+
+    await prisma.orderComponent.deleteMany({ where: { orderId: order.body.id } });
+    await prisma.repairComponent.deleteMany({ where: { repairId: repair.body.id } });
+    await agent.delete(`/api/orders/${order.body.id}`).expect(204);
+    await agent.delete(`/api/repairs/${repair.body.id}`).expect(204);
+    await agent.delete(`/api/inventory/items/${inventoryItem.body.id}`).expect(204);
+    await agent.delete(`/api/employees/${technician.body.id}`).expect(204);
+    await agent
+      .delete(`/api/orders/categories/additional/${orderAdditionalCategory.body.id}`)
+      .expect(204);
+    await agent
+      .delete(`/api/orders/categories/main/${orderMainCategory.body.id}`)
+      .expect(204);
+    await agent
+      .delete(`/api/inventory/categories/additional/${inventoryAdditionalCategory.body.id}`)
+      .expect(204);
+    await agent
+      .delete(`/api/inventory/categories/main/${inventoryMainCategory.body.id}`)
       .expect(204);
   });
 });

@@ -11,12 +11,14 @@ import { z } from 'zod';
 import { prisma } from '../db/prisma.js';
 import { allowRoles } from '../middlewares/allowRoles.js';
 import { requireAuth } from '../middlewares/requireAuth.js';
+import { formatRepairNumber } from '../utils/workNumber.js';
 
 const REPAIR_PAGE_SIZE = 50;
 const idSchema = z.string().uuid();
 
 const repairSelect = {
   id: true,
+  number: true,
   name: true,
   description: true,
   customerType: true,
@@ -54,6 +56,7 @@ const repairDetailsSelect = {
 
 type SelectedRepair = {
   id: string;
+  number: number;
   name: string;
   description: string | null;
   customerType: 'INDIVIDUAL' | 'LEGAL_ENTITY';
@@ -93,6 +96,7 @@ const validationError = (message = 'Проверьте введённые дан
 
 const mapRepair = (repair: SelectedRepair) => ({
   ...repair,
+  number: formatRepairNumber(repair.number),
   description: repair.description ?? '',
   customerMiddleName: repair.customerMiddleName ?? '',
   companyName: repair.companyName ?? '',
@@ -415,6 +419,13 @@ repairsRouter.delete('/:id', allowRoles('MANAGER'), async (request, response) =>
   } catch (error) {
     if (isPrismaError(error, 'P2025')) {
       response.status(404).json({ code: 'NOT_FOUND', message: 'Ремонт не найден' });
+      return;
+    }
+    if (isPrismaError(error, 'P2003')) {
+      response.status(409).json({
+        code: 'REPAIR_HAS_COMPONENTS',
+        message: 'Сначала верните добавленные компоненты на склад',
+      });
       return;
     }
     throw error;
