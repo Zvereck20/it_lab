@@ -151,6 +151,7 @@ export const WarehousePage = () => {
               label="Основная категория"
               options={categories?.mainCategories ?? []}
               value={mainCategoryId}
+              size="small"
               onChange={(value) => {
                 setMainCategoryId(value);
                 setAdditionalCategoryId('');
@@ -161,6 +162,7 @@ export const WarehousePage = () => {
               label="Доп. категория"
               options={availableAdditionalCategories}
               value={additionalCategoryId}
+              size="small"
               onChange={setAdditionalCategoryId}
               disabled={!mainCategoryId}
             />
@@ -227,15 +229,7 @@ export const WarehousePage = () => {
                   </TableCell>
                   {hasItemActions && (
                     <TableCell align="center" sx={{ verticalAlign: 'middle' }}>
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        sx={{
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          flexWrap: 'wrap',
-                        }}
-                      >
+                      <Stack spacing={0.5} sx={{ alignItems: 'center' }}>
                         {canAllocateItems && (
                           <Button
                             size="small"
@@ -252,7 +246,11 @@ export const WarehousePage = () => {
                           </Button>
                         )}
                         {canManageItems && (
-                          <>
+                          <Stack
+                            direction="row"
+                            spacing={0.5}
+                            sx={{ alignItems: 'center', justifyContent: 'center' }}
+                          >
                             <Link
                               to={`/warehouse/${item.id}/edit`}
                               style={{ textDecoration: 'none' }}
@@ -267,7 +265,7 @@ export const WarehousePage = () => {
                             >
                               Удалить
                             </Button>
-                          </>
+                          </Stack>
                         )}
                       </Stack>
                     </TableCell>
