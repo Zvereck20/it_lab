@@ -11,12 +11,14 @@ import { z } from 'zod';
 import { prisma } from '../db/prisma.js';
 import { allowRoles } from '../middlewares/allowRoles.js';
 import { requireAuth } from '../middlewares/requireAuth.js';
+import { formatRepairNumber } from '../utils/workNumber.js';
 
 const REPAIR_PAGE_SIZE = 50;
 const idSchema = z.string().uuid();
 
 const repairSelect = {
   id: true,
+  number: true,
   name: true,
   description: true,
   customerType: true,
@@ -54,6 +56,7 @@ const repairDetailsSelect = {
 
 type SelectedRepair = {
   id: string;
+  number: number;
   name: string;
   description: string | null;
   customerType: 'INDIVIDUAL' | 'LEGAL_ENTITY';
@@ -91,8 +94,19 @@ const validationError = (message = 'Проверьте введённые дан
   message,
 });
 
+const repairVisibilityFilter = (user: AuthUser): Prisma.RepairWhereInput =>
+  user.role === 'TECHNICIAN'
+    ? {
+        OR: [
+          { assignmentMode: 'FREE_QUEUE' },
+          { technicianId: user.id! },
+        ],
+      }
+    : {};
+
 const mapRepair = (repair: SelectedRepair) => ({
   ...repair,
+  number: formatRepairNumber(repair.number),
   description: repair.description ?? '',
   customerMiddleName: repair.customerMiddleName ?? '',
   companyName: repair.companyName ?? '',
@@ -158,28 +172,40 @@ repairsRouter.use(requireAuth);
 
 repairsRouter.get('/', async (request, response) => {
   const parsedQuery = repairListQuerySchema.safeParse(request.query);
+  const user = request.session.user;
 
   if (!parsedQuery.success) {
     response.status(400).json(validationError('Некорректные параметры поиска или фильтра'));
     return;
   }
+  if (!user) {
+    response.status(401).json({ code: 'UNAUTHORIZED', message: 'Требуется авторизация' });
+    return;
+  }
+  if (user.role === 'TECHNICIAN' && !user.id) {
+    response.status(403).json({ code: 'FORBIDDEN', message: 'Не удалось определить сотрудника' });
+    return;
+  }
 
   const { page, search, technicianId, status } = parsedQuery.data;
   const where: Prisma.RepairWhereInput = {
-    ...(search
-      ? {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' as const } },
-            { description: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
-      : {}),
-    ...(technicianId
-      ? technicianId === 'free_queue'
-        ? { assignmentMode: 'FREE_QUEUE' }
-        : { technicianId }
-      : {}),
-    ...(status ? { status } : {}),
+    AND: [
+      repairVisibilityFilter(user),
+      search
+        ? {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' as const } },
+              { description: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {},
+      technicianId
+        ? technicianId === 'free_queue'
+          ? { assignmentMode: 'FREE_QUEUE' }
+          : { technicianId }
+        : {},
+      status ? { status } : {},
+    ],
   };
 
   const [repairs, total] = await Promise.all([
@@ -206,14 +232,19 @@ repairsRouter.get('/', async (request, response) => {
 
 repairsRouter.get('/:id', async (request, response) => {
   const parsedId = idSchema.safeParse(request.params.id);
+  const user = request.session.user;
 
   if (!parsedId.success) {
     response.status(400).json(validationError());
     return;
   }
+  if (!user || (user.role === 'TECHNICIAN' && !user.id)) {
+    response.status(403).json({ code: 'FORBIDDEN', message: 'Ремонт недоступен' });
+    return;
+  }
 
-  const repair = await prisma.repair.findUnique({
-    where: { id: parsedId.data },
+  const repair = await prisma.repair.findFirst({
+    where: { id: parsedId.data, ...repairVisibilityFilter(user) },
     select: repairDetailsSelect,
   });
 
@@ -415,6 +446,13 @@ repairsRouter.delete('/:id', allowRoles('MANAGER'), async (request, response) =>
   } catch (error) {
     if (isPrismaError(error, 'P2025')) {
       response.status(404).json({ code: 'NOT_FOUND', message: 'Ремонт не найден' });
+      return;
+    }
+    if (isPrismaError(error, 'P2003')) {
+      response.status(409).json({
+        code: 'REPAIR_HAS_COMPONENTS',
+        message: 'Сначала верните добавленные компоненты на склад',
+      });
       return;
     }
     throw error;

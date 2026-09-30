@@ -151,6 +151,7 @@ export const OrdersPage = () => {
               label="Основная категория"
               options={categories?.mainCategories ?? []}
               value={mainCategoryId}
+              size="small"
               onChange={(value) => {
                 setMainCategoryId(value);
                 setAdditionalCategoryId('');
@@ -160,6 +161,7 @@ export const OrdersPage = () => {
               label="Дополнительная категория"
               options={availableAdditionalCategories}
               value={additionalCategoryId}
+              size="small"
               onChange={setAdditionalCategoryId}
               disabled={!mainCategoryId}
             />

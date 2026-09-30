@@ -51,6 +51,15 @@ enum OrderAssignmentMode {
   ASSIGNED
 }
 
+enum InventoryMovementType {
+  STOCK_RECEIPT
+  MANUAL_DECREASE
+  ORDER_ALLOCATION
+  REPAIR_ALLOCATION
+  ORDER_RETURN
+  REPAIR_RETURN
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   login        String   @unique @db.VarChar(50)
@@ -70,6 +79,7 @@ model User {
 
 model Repair {
   id                 String               @id @default(uuid()) @db.Uuid
+  number             Int                  @unique @default(autoincrement())
   name               String               @db.VarChar(150)
   description        String?
   customerType       CustomerType         @default(INDIVIDUAL)
@@ -86,6 +96,8 @@ model Repair {
   updatedAt          DateTime             @updatedAt @db.Timestamp(3)
   technician         User?                @relation(fields: [technicianId], references: [id], onDelete: Restrict)
   statusHistory      RepairStatusHistory[]
+  components         RepairComponent[]
+  inventoryMovements InventoryMovement[]
 
   @@index([name])
   @@index([technicianId])
@@ -113,6 +125,7 @@ model RepairStatusHistory {
 
 model Order {
   id                    String                       @id @default(uuid()) @db.Uuid
+  number                Int                          @unique @default(autoincrement())
   name                  String                       @db.VarChar(150)
   description           String?
   companyName           String                       @db.VarChar(150)
@@ -131,6 +144,8 @@ model Order {
   additionalCategories  OrderAdditionalCategoryLink[]
   technician            User?                        @relation(fields: [technicianId], references: [id], onDelete: Restrict)
   statusHistory         OrderStatusHistory[]
+  components            OrderComponent[]
+  inventoryMovements    InventoryMovement[]
 
   @@index([name])
   @@index([mainCategoryId])
@@ -253,10 +268,66 @@ model InventoryItem {
   updatedAt            DateTime                          @updatedAt @db.Timestamp(3)
   mainCategory         MainCategory                      @relation(fields: [mainCategoryId], references: [id], onDelete: Restrict)
   additionalCategories InventoryItemAdditionalCategory[]
+  orderComponents      OrderComponent[]
+  repairComponents     RepairComponent[]
+  movements            InventoryMovement[]
 
   @@index([name])
   @@index([mainCategoryId])
   @@map("inventory_items")
+}
+
+model OrderComponent {
+  id              String        @id @default(uuid()) @db.Uuid
+  orderId         String        @db.Uuid
+  inventoryItemId String        @db.Uuid
+  nameSnapshot    String        @db.VarChar(150)
+  quantity        Int
+  createdAt       DateTime      @default(now()) @db.Timestamp(3)
+  updatedAt       DateTime      @updatedAt @db.Timestamp(3)
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, inventoryItemId])
+  @@index([inventoryItemId])
+  @@map("order_components")
+}
+
+model RepairComponent {
+  id              String        @id @default(uuid()) @db.Uuid
+  repairId        String        @db.Uuid
+  inventoryItemId String        @db.Uuid
+  nameSnapshot    String        @db.VarChar(150)
+  quantity        Int
+  createdAt       DateTime      @default(now()) @db.Timestamp(3)
+  updatedAt       DateTime      @updatedAt @db.Timestamp(3)
+  repair          Repair        @relation(fields: [repairId], references: [id], onDelete: Restrict)
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@unique([repairId, inventoryItemId])
+  @@index([inventoryItemId])
+  @@map("repair_components")
+}
+
+model InventoryMovement {
+  id              String                @id @default(uuid()) @db.Uuid
+  inventoryItemId String                @db.Uuid
+  operationType   InventoryMovementType
+  quantityDelta   Int
+  orderId         String?               @db.Uuid
+  repairId        String?               @db.Uuid
+  performedById   String                @db.VarChar(50)
+  performedByName String                @db.VarChar(100)
+  createdAt       DateTime              @default(now()) @db.Timestamp(3)
+  inventoryItem   InventoryItem         @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  order           Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  repair          Repair?               @relation(fields: [repairId], references: [id], onDelete: SetNull)
+
+  @@index([inventoryItemId, createdAt])
+  @@index([orderId])
+  @@index([repairId])
+  @@index([performedById])
+  @@map("inventory_movements")
 }
 
 model InventoryItemAdditionalCategory {
