@@ -69,7 +69,7 @@ export const WorkItemComponentsSection = ({
   const [updateComponent, updateState] = useUpdateWorkItemComponentMutation();
   const [deleteComponent, deleteState] = useDeleteWorkItemComponentMutation();
   const { data: inventoryData, isFetching: inventoryIsFetching } = useGetInventoryItemsQuery(
-    { page: 1, search: debouncedSearch.trim() || undefined },
+    { page: 1, search: debouncedSearch.trim() || undefined, searchField: 'name' },
     { skip: !addDialogOpen },
   );
   const { data: editingInventoryItem } = useGetInventoryItemQuery(

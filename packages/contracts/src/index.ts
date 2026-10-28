@@ -133,6 +133,7 @@ export type InventoryItem = z.infer<typeof inventoryItemSchema>;
 export const inventoryListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   search: z.string().trim().max(200).optional(),
+  searchField: z.enum(['name']).optional(),
   mainCategoryId: z.string().uuid().optional(),
   additionalCategoryId: z.string().uuid().optional(),
 });

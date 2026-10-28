@@ -158,6 +158,20 @@ describe('inventory', () => {
     });
     expect(filteredResponse.body.items[0].name).toBe('Тестовый картридж');
 
+    const nameOnlyDescriptionSearch = await agent
+      .get('/api/inventory/items')
+      .query({ page: 1, search: 'проверки', searchField: 'name' })
+      .expect(200);
+    expect(nameOnlyDescriptionSearch.body.pagination.total).toBe(0);
+
+    const nameOnlyNameSearch = await agent
+      .get('/api/inventory/items')
+      .query({ page: 1, search: 'картридж', searchField: 'name' })
+      .expect(200);
+    expect(nameOnlyNameSearch.body.items).toEqual([
+      expect.objectContaining({ id: itemResponse.body.id }),
+    ]);
+
     const blockedDeleteResponse = await agent
       .delete(`/api/inventory/categories/additional/${sparePartsResponse.body.id}`);
 

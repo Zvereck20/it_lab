@@ -568,7 +568,7 @@ inventoryRouter.get('/items', async (request, response) => {
     return;
   }
 
-  const { page, search, mainCategoryId, additionalCategoryId } = parsedQuery.data;
+  const { page, search, searchField, mainCategoryId, additionalCategoryId } = parsedQuery.data;
 
   if (additionalCategoryId && !mainCategoryId) {
     response.status(400).json(validationError('Сначала выберите основную категорию'));
@@ -577,12 +577,14 @@ inventoryRouter.get('/items', async (request, response) => {
 
   const where: Prisma.InventoryItemWhereInput = {
     ...(search
-      ? {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' as const } },
-            { description: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
+      ? searchField === 'name'
+        ? { name: { contains: search, mode: 'insensitive' as const } }
+        : {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' as const } },
+              { description: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
       : {}),
     ...(mainCategoryId ? { mainCategoryId } : {}),
     ...(additionalCategoryId
