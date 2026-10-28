@@ -20,6 +20,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 
 import { useGetSessionQuery } from '../app/api';
 import { formatRussianPhone } from '../components/PhoneField';
+import { WorkItemComponentsSection } from '../components/WorkItemComponentsSection';
 import { getApiErrorMessage } from '../features/inventory/getApiErrorMessage';
 import {
   useDeleteRepairMutation,
@@ -64,6 +65,14 @@ export const RepairDetailsPage = () => {
   const canTake = role === 'TECHNICIAN' && repair?.assignmentMode === 'FREE_QUEUE';
   const canChangeStatus = Boolean(
     canManage
+    || (
+      role === 'TECHNICIAN'
+      && repair?.assignmentMode === 'ASSIGNED'
+      && repair.technicianId === session?.user.id
+    ),
+  );
+  const canManageComponents = Boolean(
+    role === 'ADMIN'
     || (
       role === 'TECHNICIAN'
       && repair?.assignmentMode === 'ASSIGNED'
@@ -230,6 +239,14 @@ export const RepairDetailsPage = () => {
           </Box>
         </Stack>
       </Paper>
+
+      <WorkItemComponentsSection
+        type="repair"
+        workItemId={repair.id}
+        components={repair.components}
+        canManage={canManageComponents}
+        isCompleted={repair.status === 'COMPLETED'}
+      />
 
       <Paper variant="outlined" sx={{ p: 3 }}>
         <Stack spacing={2}>

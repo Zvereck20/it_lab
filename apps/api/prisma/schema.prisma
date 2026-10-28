@@ -283,6 +283,8 @@ model OrderComponent {
   inventoryItemId String        @db.Uuid
   nameSnapshot    String        @db.VarChar(150)
   quantity        Int
+  addedById       String        @db.VarChar(50)
+  addedByName     String        @db.VarChar(100)
   createdAt       DateTime      @default(now()) @db.Timestamp(3)
   updatedAt       DateTime      @updatedAt @db.Timestamp(3)
   order           Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
@@ -299,6 +301,8 @@ model RepairComponent {
   inventoryItemId String        @db.Uuid
   nameSnapshot    String        @db.VarChar(150)
   quantity        Int
+  addedById       String        @db.VarChar(50)
+  addedByName     String        @db.VarChar(100)
   createdAt       DateTime      @default(now()) @db.Timestamp(3)
   updatedAt       DateTime      @updatedAt @db.Timestamp(3)
   repair          Repair        @relation(fields: [repairId], references: [id], onDelete: Restrict)

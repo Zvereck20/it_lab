@@ -12,6 +12,9 @@ import type {
   InventoryListResponse,
   MainCategory,
   MainCategoryInput,
+  WorkItemComponent,
+  WorkItemComponentInput,
+  WorkItemComponentQuantityInput,
 } from '@itlab/contracts';
 
 import { api } from '../../../app/api';
@@ -19,6 +22,22 @@ import { api } from '../../../app/api';
 interface UpdateEntity<T> {
   id: string;
   body: T;
+}
+
+export type WorkItemType = 'order' | 'repair';
+
+interface WorkItemComponentTarget {
+  type: WorkItemType;
+  workItemId: string;
+}
+
+interface UpdateWorkItemComponent extends WorkItemComponentTarget {
+  componentId: string;
+  body: WorkItemComponentQuantityInput;
+}
+
+interface DeleteWorkItemComponent extends WorkItemComponentTarget {
+  componentId: string;
 }
 
 export const inventoryApi = api.injectEndpoints({
@@ -112,6 +131,41 @@ export const inventoryApi = api.injectEndpoints({
         'Repairs',
       ],
     }),
+    addWorkItemComponent: builder.mutation<
+      WorkItemComponent,
+      WorkItemComponentTarget & { body: WorkItemComponentInput }
+    >({
+      query: ({ type, workItemId, body }) => ({
+        url: `/inventory/work-items/${type}/${workItemId}/components`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { type, workItemId }) => [
+        'InventoryItems',
+        { type: type === 'order' ? 'Orders' : 'Repairs', id: workItemId },
+      ],
+    }),
+    updateWorkItemComponent: builder.mutation<WorkItemComponent, UpdateWorkItemComponent>({
+      query: ({ type, workItemId, componentId, body }) => ({
+        url: `/inventory/work-items/${type}/${workItemId}/components/${componentId}`,
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { type, workItemId }) => [
+        'InventoryItems',
+        { type: type === 'order' ? 'Orders' : 'Repairs', id: workItemId },
+      ],
+    }),
+    deleteWorkItemComponent: builder.mutation<void, DeleteWorkItemComponent>({
+      query: ({ type, workItemId, componentId }) => ({
+        url: `/inventory/work-items/${type}/${workItemId}/components/${componentId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, { type, workItemId }) => [
+        'InventoryItems',
+        { type: type === 'order' ? 'Orders' : 'Repairs', id: workItemId },
+      ],
+    }),
     createInventoryItem: builder.mutation<InventoryItem, InventoryItemInput>({
       query: (body) => ({
         url: '/inventory/items',
@@ -153,6 +207,9 @@ export const {
   useGetInventoryItemQuery,
   useGetInventoryAllocationTargetsQuery,
   useAllocateInventoryItemMutation,
+  useAddWorkItemComponentMutation,
+  useUpdateWorkItemComponentMutation,
+  useDeleteWorkItemComponentMutation,
   useCreateInventoryItemMutation,
   useUpdateInventoryItemMutation,
   useDeleteInventoryItemMutation,

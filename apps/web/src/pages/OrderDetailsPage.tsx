@@ -20,6 +20,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 
 import { useGetSessionQuery } from '../app/api';
 import { formatRussianPhone } from '../components/PhoneField';
+import { WorkItemComponentsSection } from '../components/WorkItemComponentsSection';
 import { getApiErrorMessage } from '../features/inventory/getApiErrorMessage';
 import {
   useDeleteOrderMutation,
@@ -62,6 +63,14 @@ export const OrderDetailsPage = () => {
   const canTake = role === 'TECHNICIAN' && order?.assignmentMode === 'FREE_QUEUE';
   const canChangeStatus = Boolean(
     canManage
+    || (
+      role === 'TECHNICIAN'
+      && order?.assignmentMode === 'ASSIGNED'
+      && order.technicianId === session?.user.id
+    ),
+  );
+  const canManageComponents = Boolean(
+    role === 'ADMIN'
     || (
       role === 'TECHNICIAN'
       && order?.assignmentMode === 'ASSIGNED'
@@ -208,6 +217,14 @@ export const OrderDetailsPage = () => {
           </Box>
         </Stack>
       </Paper>
+
+      <WorkItemComponentsSection
+        type="order"
+        workItemId={order.id}
+        components={order.components}
+        canManage={canManageComponents}
+        isCompleted={order.status === 'COMPLETED'}
+      />
 
       <Paper variant="outlined" sx={{ p: 3 }}>
         <Stack spacing={2}>
