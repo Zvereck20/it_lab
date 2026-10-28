@@ -7,6 +7,7 @@ import { SESSION_COOKIE_NAME, SESSION_DURATION_MS } from './config/auth.js';
 import { env } from './config/env.js';
 import { sessionPool } from './db/sessionPool.js';
 import { authRouter } from './routes/auth.routes.js';
+import { cardComponentsRouter } from './routes/cardComponents.routes.js';
 import { employeesRouter } from './routes/employees.routes.js';
 import { inventoryRouter } from './routes/inventory.routes.js';
 import { ordersRouter } from './routes/orders.routes.js';
@@ -51,6 +52,7 @@ export const createApp = () => {
   app.use('/api/auth', authRouter);
   app.use('/api/employees', employeesRouter);
   app.use('/api/inventory', inventoryRouter);
+  app.use('/api/card-components', cardComponentsRouter);
   app.use('/api/orders', ordersRouter);
   app.use('/api/repairs', repairsRouter);
 

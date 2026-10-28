@@ -740,6 +740,45 @@ describe('inventory allocations', () => {
       }),
     ]));
 
+    const cardUrl = `/api/card-components/order/${order.body.id}`;
+    const freeCardUrl = `/api/card-components/order/${freeOrder.body.id}`;
+    await technicianAgent.post(freeCardUrl)
+      .send({ inventoryItemId: inventoryItem.body.id, quantity: 1 }).expect(403);
+    await technicianAgent.post(`/api/card-components/order/${otherOrder.body.id}`)
+      .send({ inventoryItemId: inventoryItem.body.id, quantity: 1 }).expect(403);
+    const added = await agent.post(freeCardUrl)
+      .send({ inventoryItemId: inventoryItem.body.id, quantity: 1 }).expect(201);
+    expect(added.body.ok).toBe(true);
+    await agent.post(freeCardUrl)
+      .send({ inventoryItemId: inventoryItem.body.id, quantity: 1 }).expect(409);
+    const card = await agent.get(freeCardUrl).expect(200);
+    expect(card.body.items[0]).toMatchObject({
+      name: inventoryItem.body.name, quantity: 1, addedByName: 'Администратор',
+    });
+    const cardComponentId = card.body.items[0].id;
+    await agent.patch(`${freeCardUrl}/${cardComponentId}`).send({ quantity: 2 }).expect(200);
+    await agent.patch(`${freeCardUrl}/${cardComponentId}`).send({ quantity: 1 }).expect(200);
+    await agent.delete(`${freeCardUrl}/${cardComponentId}`).expect(204);
+    await technicianAgent.get(`/api/card-components/order/${otherOrder.body.id}`).expect(404);
+
+    const repairCardUrl = `/api/card-components/repair/${repair.body.id}`;
+    await technicianAgent.post(repairCardUrl)
+      .send({ inventoryItemId: inventoryItem.body.id, quantity: 1 }).expect(409);
+    const secondInventoryItem = await agent.post('/api/inventory/items').send({
+      name: `Карточка ${suffix}`, description: '', count: 4,
+      mainCategoryId: inventoryMainCategory.body.id,
+      additionalCategoryIds: [inventoryAdditionalCategory.body.id],
+    }).expect(201);
+    await technicianAgent.post(repairCardUrl)
+      .send({ inventoryItemId: secondInventoryItem.body.id, quantity: 2 }).expect(201);
+    const repairCard = await technicianAgent.get(repairCardUrl).expect(200);
+    expect(repairCard.body.items.find((c: { inventoryItemId: string }) => c.inventoryItemId === secondInventoryItem.body.id))
+      .toMatchObject({ addedByName: 'Техник Распределения', quantity: 2 });
+    const repairCardComponentId = repairCard.body.items.find((c: { inventoryItemId: string }) => c.inventoryItemId === secondInventoryItem.body.id).id;
+    await technicianAgent.delete(`${repairCardUrl}/${repairCardComponentId}`).expect(204);
+    expect((await agent.get(`/api/inventory/items/${secondInventoryItem.body.id}`).expect(200)).body.count).toBe(4);
+    await agent.delete(`/api/inventory/items/${secondInventoryItem.body.id}`).expect(204);
+
     const insufficientResponse = await technicianAgent
       .post(`/api/inventory/items/${inventoryItem.body.id}/allocate`)
       .send({
@@ -768,6 +807,8 @@ describe('inventory allocations', () => {
       .send({ quantity: 1, targets: [{ type: 'ORDER', id: order.body.id }] })
       .expect(409);
     expect(completedAllocation.body.code).toBe('TARGET_COMPLETED');
+    await agent.post(cardUrl)
+      .send({ inventoryItemId: inventoryItem.body.id, quantity: 1 }).expect(409);
 
     await prisma.orderComponent.deleteMany({ where: { orderId: order.body.id } });
     await prisma.repairComponent.deleteMany({ where: { repairId: repair.body.id } });

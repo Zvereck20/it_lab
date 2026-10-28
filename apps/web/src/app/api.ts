@@ -14,6 +14,7 @@ export const api = createApi({
   tagTypes: [
     'Session',
     'InventoryItems',
+    'CardComponents',
     'InventoryCategories',
     'Employees',
     'Technicians',

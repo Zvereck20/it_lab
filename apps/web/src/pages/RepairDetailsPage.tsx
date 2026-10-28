@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { useGetSessionQuery } from '../app/api';
+import { CardComponents } from '../components/CardComponents';
 import { formatRussianPhone } from '../components/PhoneField';
 import { getApiErrorMessage } from '../features/inventory/getApiErrorMessage';
 import {
@@ -230,6 +231,12 @@ export const RepairDetailsPage = () => {
           </Box>
         </Stack>
       </Paper>
+
+      <CardComponents target={{ type: 'repair', id: repair.id }} editable={
+        repair.status !== 'COMPLETED' && (role === 'ADMIN' || (
+          role === 'TECHNICIAN' && repair.assignmentMode === 'ASSIGNED' && repair.technicianId === session?.user.id
+        ))
+      } />
 
       <Paper variant="outlined" sx={{ p: 3 }}>
         <Stack spacing={2}>

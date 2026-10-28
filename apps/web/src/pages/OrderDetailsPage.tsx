@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { useGetSessionQuery } from '../app/api';
+import { CardComponents } from '../components/CardComponents';
 import { formatRussianPhone } from '../components/PhoneField';
 import { getApiErrorMessage } from '../features/inventory/getApiErrorMessage';
 import {
@@ -208,6 +209,12 @@ export const OrderDetailsPage = () => {
           </Box>
         </Stack>
       </Paper>
+
+      <CardComponents target={{ type: 'order', id: order.id }} editable={
+        order.status !== 'COMPLETED' && (role === 'ADMIN' || (
+          role === 'TECHNICIAN' && order.assignmentMode === 'ASSIGNED' && order.technicianId === session?.user.id
+        ))
+      } />
 
       <Paper variant="outlined" sx={{ p: 3 }}>
         <Stack spacing={2}>
