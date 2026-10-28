@@ -151,6 +151,73 @@ export const inventoryListResponseSchema = z.object({
 
 export type InventoryListResponse = z.infer<typeof inventoryListResponseSchema>;
 
+export const inventoryAllocationTargetTypeSchema = z.enum(['ORDER', 'REPAIR']);
+
+export type InventoryAllocationTargetType = z.infer<
+  typeof inventoryAllocationTargetTypeSchema
+>;
+
+export const inventoryAllocationTargetSchema = z.object({
+  type: inventoryAllocationTargetTypeSchema,
+  id: z.string().uuid(),
+});
+
+export type InventoryAllocationTarget = z.infer<typeof inventoryAllocationTargetSchema>;
+
+export const inventoryAllocationInputSchema = z.object({
+  quantity: z
+    .number({ error: 'Укажите количество' })
+    .int('Количество должно быть целым числом')
+    .min(1, 'Количество должно быть не меньше 1'),
+  targets: z
+    .array(inventoryAllocationTargetSchema)
+    .min(1, 'Выберите хотя бы один заказ или ремонт')
+    .max(50, 'За одну операцию можно выбрать не более 50 записей')
+    .refine(
+      (targets) => new Set(targets.map((target) => `${target.type}:${target.id}`)).size
+        === targets.length,
+      'Выбранные заказы и ремонты не должны повторяться',
+    ),
+});
+
+export type InventoryAllocationInput = z.infer<typeof inventoryAllocationInputSchema>;
+
+export const inventoryAllocationTargetsQuerySchema = z.object({
+  search: z.string().trim().max(20).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export type InventoryAllocationTargetsQuery = z.infer<
+  typeof inventoryAllocationTargetsQuerySchema
+>;
+
+export const inventoryAllocationTargetOptionSchema = z.object({
+  id: z.string().uuid(),
+  type: inventoryAllocationTargetTypeSchema,
+  number: z.string(),
+  disabled: z.boolean(),
+});
+
+export type InventoryAllocationTargetOption = z.infer<
+  typeof inventoryAllocationTargetOptionSchema
+>;
+
+export const inventoryAllocationTargetsResponseSchema = z.object({
+  items: z.array(inventoryAllocationTargetOptionSchema),
+});
+
+export type InventoryAllocationTargetsResponse = z.infer<
+  typeof inventoryAllocationTargetsResponseSchema
+>;
+
+export const inventoryAllocationResponseSchema = z.object({
+  inventoryItemId: z.string().uuid(),
+  remainingCount: z.number().int().min(0),
+  allocatedTargets: z.number().int().min(1),
+});
+
+export type InventoryAllocationResponse = z.infer<typeof inventoryAllocationResponseSchema>;
+
 export const employeeRoleSchema = z.enum(['MANAGER', 'TECHNICIAN']);
 
 export type EmployeeRole = z.infer<typeof employeeRoleSchema>;
@@ -320,6 +387,7 @@ const repairTechnicianSchema = z.object({
 
 export const repairSchema = repairBaseInputSchema.extend({
   id: z.string().uuid(),
+  number: z.string(),
   status: repairStatusSchema,
   assignmentMode: repairAssignmentModeSchema,
   technician: repairTechnicianSchema.nullable(),
@@ -461,6 +529,7 @@ export type OrderInput = z.infer<typeof orderInputSchema>;
 
 export const orderSchema = orderBaseInputSchema.extend({
   id: z.string().uuid(),
+  number: z.string(),
   status: orderStatusSchema,
   assignmentMode: orderAssignmentModeSchema,
   mainCategory: mainCategorySchema,

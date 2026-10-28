@@ -79,6 +79,18 @@ export const seedInventory = async () => {
                 additionalCategoryId,
               })),
             },
+            ...(item.count > 0
+              ? {
+                  movements: {
+                    create: {
+                      operationType: 'STOCK_RECEIPT' as const,
+                      quantityDelta: item.count,
+                      performedById: 'SYSTEM',
+                      performedByName: 'Система',
+                    },
+                  },
+                }
+              : {}),
           },
         })),
     );

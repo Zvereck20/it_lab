@@ -99,7 +99,10 @@ export const AppHeader = () => {
                   style={{ textDecoration: 'none' }}
                 >
                   {({ isActive }) => (
-                    <Button variant={isActive ? 'contained' : 'text'}>
+                    <Button
+                      variant={isActive ? 'contained' : 'text'}
+                      sx={{ px: 2 }}
+                    >
                       {item.label}
                     </Button>
                   )}
@@ -108,7 +111,10 @@ export const AppHeader = () => {
               {data?.user.role === 'ADMIN' && (
                 <NavLink to="/employees" style={{ textDecoration: 'none' }}>
                   {({ isActive }) => (
-                    <Button variant={isActive ? 'contained' : 'text'}>
+                    <Button
+                      variant={isActive ? 'contained' : 'text'}
+                      sx={{ px: 2 }}
+                    >
                       Сотрудники
                     </Button>
                   )}

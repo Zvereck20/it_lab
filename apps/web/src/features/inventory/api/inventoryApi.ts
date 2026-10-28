@@ -2,6 +2,10 @@ import type {
   AdditionalCategory,
   AdditionalCategoryInput,
   InventoryCategoriesResponse,
+  InventoryAllocationInput,
+  InventoryAllocationResponse,
+  InventoryAllocationTargetsQuery,
+  InventoryAllocationTargetsResponse,
   InventoryItem,
   InventoryItemInput,
   InventoryListQuery,
@@ -83,6 +87,31 @@ export const inventoryApi = api.injectEndpoints({
       query: (id) => `/inventory/items/${id}`,
       providesTags: (_result, _error, id) => [{ type: 'InventoryItems', id }],
     }),
+    getInventoryAllocationTargets: builder.query<
+      InventoryAllocationTargetsResponse,
+      InventoryAllocationTargetsQuery
+    >({
+      query: (params) => ({
+        url: '/inventory/allocation-targets',
+        params,
+      }),
+    }),
+    allocateInventoryItem: builder.mutation<
+      InventoryAllocationResponse,
+      { id: string; body: InventoryAllocationInput }
+    >({
+      query: ({ id, body }) => ({
+        url: `/inventory/items/${id}/allocate`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        'InventoryItems',
+        { type: 'InventoryItems', id },
+        'Orders',
+        'Repairs',
+      ],
+    }),
     createInventoryItem: builder.mutation<InventoryItem, InventoryItemInput>({
       query: (body) => ({
         url: '/inventory/items',
@@ -122,6 +151,8 @@ export const {
   useDeleteAdditionalCategoryMutation,
   useGetInventoryItemsQuery,
   useGetInventoryItemQuery,
+  useGetInventoryAllocationTargetsQuery,
+  useAllocateInventoryItemMutation,
   useCreateInventoryItemMutation,
   useUpdateInventoryItemMutation,
   useDeleteInventoryItemMutation,

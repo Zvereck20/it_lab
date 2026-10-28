@@ -20,6 +20,7 @@ interface CategoryAutocompleteProps {
   options: CategoryOption[];
   value: string;
   onChange: (value: string) => void;
+  size?: 'small' | 'medium';
   disabled?: boolean;
   error?: boolean;
   helperText?: string;
@@ -57,6 +58,7 @@ export const CategoryAutocomplete = ({
   options,
   value,
   onChange,
+  size = 'medium',
   disabled,
   error,
   helperText,
@@ -95,6 +97,7 @@ export const CategoryAutocomplete = ({
         <TextField
           {...params}
           label={label}
+          size={size}
           error={error}
           helperText={helperText}
         />

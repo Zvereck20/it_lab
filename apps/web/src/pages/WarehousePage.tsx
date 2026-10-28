@@ -1,4 +1,4 @@
-import type { InventoryListQuery } from '@itlab/contracts';
+import type { InventoryItem, InventoryListQuery } from '@itlab/contracts';
 import {
   Alert,
   Box,
@@ -22,6 +22,7 @@ import { Link } from 'react-router';
 
 import { useGetSessionQuery } from '../app/api';
 import { CategoryAutocomplete } from '../components/CategoryAutocomplete';
+import { InventoryAllocationDialog } from '../components/InventoryAllocationDialog';
 import {
   useDeleteInventoryItemMutation,
   useGetInventoryCategoriesQuery,
@@ -37,11 +38,15 @@ export const WarehousePage = () => {
   const [mainCategoryId, setMainCategoryId] = useState('');
   const [additionalCategoryId, setAdditionalCategoryId] = useState('');
   const [actionError, setActionError] = useState<string>();
+  const [actionSuccess, setActionSuccess] = useState<string>();
+  const [allocationItem, setAllocationItem] = useState<InventoryItem | null>(null);
   const { data, isFetching, isError } = useGetInventoryItemsQuery(query);
   const [deleteItem, { isLoading: isDeleting }] = useDeleteInventoryItemMutation();
 
   const role = session?.user.role;
   const canManageItems = role === 'ADMIN' || role === 'MANAGER';
+  const canAllocateItems = role === 'ADMIN' || role === 'TECHNICIAN';
+  const hasItemActions = canManageItems || canAllocateItems;
   const availableAdditionalCategories = useMemo(
     () => categories?.additionalCategories.filter((category) =>
       category.mainCategoryIds.includes(mainCategoryId)) ?? [],
@@ -146,6 +151,7 @@ export const WarehousePage = () => {
               label="Основная категория"
               options={categories?.mainCategories ?? []}
               value={mainCategoryId}
+              size="small"
               onChange={(value) => {
                 setMainCategoryId(value);
                 setAdditionalCategoryId('');
@@ -156,6 +162,7 @@ export const WarehousePage = () => {
               label="Доп. категория"
               options={availableAdditionalCategories}
               value={additionalCategoryId}
+              size="small"
               onChange={setAdditionalCategoryId}
               disabled={!mainCategoryId}
             />
@@ -181,6 +188,7 @@ export const WarehousePage = () => {
       </Paper>
 
       {actionError && <Alert severity="error">{actionError}</Alert>}
+      {actionSuccess && <Alert severity="success">{actionSuccess}</Alert>}
       {isError && <Alert severity="error">Не удалось загрузить склад</Alert>}
 
       <TableContainer
@@ -195,13 +203,13 @@ export const WarehousePage = () => {
               <TableCell align="right">Количество</TableCell>
               <TableCell>Основная категория</TableCell>
               <TableCell>Доп. категория</TableCell>
-              {canManageItems && <TableCell align="right">Действия</TableCell>}
+              {hasItemActions && <TableCell align="center">Действия</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
             {isFetching && !data ? (
               <TableRow>
-                <TableCell colSpan={canManageItems ? 6 : 5}>
+                <TableCell colSpan={hasItemActions ? 6 : 5}>
                   <Box sx={{ display: 'grid', placeItems: 'center', py: 6 }}>
                     <CircularProgress size={32} />
                   </Box>
@@ -219,23 +227,46 @@ export const WarehousePage = () => {
                   <TableCell>
                     {item.additionalCategories.map((category) => category.name).join(', ') || '—'}
                   </TableCell>
-                  {canManageItems && (
-                    <TableCell align="right">
-                      <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-                        <Link
-                          to={`/warehouse/${item.id}/edit`}
-                          style={{ textDecoration: 'none' }}
-                        >
-                          <Button size="small">Изменить</Button>
-                        </Link>
-                        <Button
-                          size="small"
-                          color="error"
-                          disabled={isDeleting}
-                          onClick={() => handleDelete(item.id, item.name)}
-                        >
-                          Удалить
-                        </Button>
+                  {hasItemActions && (
+                    <TableCell align="center" sx={{ verticalAlign: 'middle' }}>
+                      <Stack spacing={0.5} sx={{ alignItems: 'center' }}>
+                        {canAllocateItems && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            disabled={item.count === 0}
+                            sx={{ px: 1, py: 0.25, fontSize: '0.75rem', lineHeight: 1.4 }}
+                            onClick={() => {
+                              setActionError(undefined);
+                              setActionSuccess(undefined);
+                              setAllocationItem(item);
+                            }}
+                          >
+                            Добавить к заказу
+                          </Button>
+                        )}
+                        {canManageItems && (
+                          <Stack
+                            direction="row"
+                            spacing={0.5}
+                            sx={{ alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <Link
+                              to={`/warehouse/${item.id}/edit`}
+                              style={{ textDecoration: 'none' }}
+                            >
+                              <Button size="small">Изменить</Button>
+                            </Link>
+                            <Button
+                              size="small"
+                              color="error"
+                              disabled={isDeleting}
+                              onClick={() => handleDelete(item.id, item.name)}
+                            >
+                              Удалить
+                            </Button>
+                          </Stack>
+                        )}
                       </Stack>
                     </TableCell>
                   )}
@@ -243,7 +274,7 @@ export const WarehousePage = () => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={canManageItems ? 6 : 5} align="center" sx={{ py: 6 }}>
+                <TableCell colSpan={hasItemActions ? 6 : 5} align="center" sx={{ py: 6 }}>
                   Позиции не найдены
                 </TableCell>
               </TableRow>
@@ -266,6 +297,13 @@ export const WarehousePage = () => {
       <Typography variant="body2" color="text.secondary">
         Найдено позиций: {data?.pagination.total ?? 0}. На странице — до 50.
       </Typography>
+
+      <InventoryAllocationDialog
+        item={allocationItem}
+        open={Boolean(allocationItem)}
+        onClose={() => setAllocationItem(null)}
+        onAllocated={setActionSuccess}
+      />
     </Stack>
   );
 };
