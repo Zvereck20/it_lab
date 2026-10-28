@@ -55,7 +55,7 @@ export const CardComponents = ({ target, editable }: { target: CardTarget; edita
 
   return <Paper variant="outlined" sx={{ p: 3 }}>
     <Stack spacing={2}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2} flexWrap="wrap">
+      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
         <Typography component="h2" variant="h5">Компоненты склада</Typography>
         {editable && !adding && <Button variant="contained" onClick={() => { setAdding(true); setError(undefined); }}>+ Добавить компонент</Button>}
       </Stack>
@@ -82,7 +82,7 @@ export const CardComponents = ({ target, editable }: { target: CardTarget; edita
       </Stack>}
       {data?.items.length === 0 && <Typography color="text.secondary">Компоненты не добавлены</Typography>}
       {data?.items.map(component => <Box key={component.id} sx={{ borderTop: 1, borderColor: 'divider', py: 2 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} gap={2} alignItems={{ md: 'center' }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} sx={{ gap: 2, alignItems: { md: 'center' } }}>
           <Box sx={{ flexGrow: 1 }}>
             <Typography>{component.name} · {component.quantity} шт.</Typography>
             <Typography variant="body2" color="text.secondary">Добавил: {component.addedByName} · {formatDate.format(new Date(component.addedAt))}</Typography>
@@ -92,7 +92,7 @@ export const CardComponents = ({ target, editable }: { target: CardTarget; edita
             <Button size="small" color="error" disabled={busy} onClick={() => deleteOne(component)}>Удалить</Button>
           </Stack>}
         </Stack>
-        {editing?.id === component.id && <Stack direction="row" gap={1} mt={2} alignItems="center">
+        {editing?.id === component.id && <Stack direction="row" sx={{ gap: 1, mt: 2, alignItems: 'center' }}>
           <TextField size="small" label="Новое количество" type="number" value={quantity}
             onChange={event => setQuantity(Number(event.target.value))} slotProps={{ htmlInput: { min: 1, step: 1 } }} />
           <Button disabled={busy || !Number.isInteger(quantity) || quantity < 1 || quantity === component.quantity} onClick={save}>Сохранить</Button>
