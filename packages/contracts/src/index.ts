@@ -133,6 +133,7 @@ export type InventoryItem = z.infer<typeof inventoryItemSchema>;
 export const inventoryListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   search: z.string().trim().max(200).optional(),
+  searchField: z.enum(['name']).optional(),
   mainCategoryId: z.string().uuid().optional(),
   additionalCategoryId: z.string().uuid().optional(),
 });
@@ -217,6 +218,40 @@ export const inventoryAllocationResponseSchema = z.object({
 });
 
 export type InventoryAllocationResponse = z.infer<typeof inventoryAllocationResponseSchema>;
+
+export const workItemComponentSchema = z.object({
+  id: z.string().uuid(),
+  inventoryItemId: z.string().uuid(),
+  name: z.string(),
+  quantity: z.number().int().min(1),
+  addedById: z.string(),
+  addedByName: z.string(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export type WorkItemComponent = z.infer<typeof workItemComponentSchema>;
+
+export const workItemComponentInputSchema = z.object({
+  inventoryItemId: z.string().uuid('Выберите компонент'),
+  quantity: z
+    .number({ error: 'Укажите количество' })
+    .int('Количество должно быть целым числом')
+    .min(1, 'Количество должно быть не меньше 1'),
+});
+
+export type WorkItemComponentInput = z.infer<typeof workItemComponentInputSchema>;
+
+export const workItemComponentQuantityInputSchema = z.object({
+  quantity: z
+    .number({ error: 'Укажите количество' })
+    .int('Количество должно быть целым числом')
+    .min(1, 'Количество должно быть не меньше 1'),
+});
+
+export type WorkItemComponentQuantityInput = z.infer<
+  typeof workItemComponentQuantityInputSchema
+>;
 
 export const employeeRoleSchema = z.enum(['MANAGER', 'TECHNICIAN']);
 
@@ -421,6 +456,7 @@ export type RepairStatusHistory = z.infer<typeof repairStatusHistorySchema>;
 
 export const repairDetailsSchema = repairSchema.extend({
   statusHistory: z.array(repairStatusHistorySchema),
+  components: z.array(workItemComponentSchema),
 });
 
 export type RepairDetails = z.infer<typeof repairDetailsSchema>;
@@ -565,6 +601,7 @@ export type OrderStatusHistory = z.infer<typeof orderStatusHistorySchema>;
 
 export const orderDetailsSchema = orderSchema.extend({
   statusHistory: z.array(orderStatusHistorySchema),
+  components: z.array(workItemComponentSchema),
 });
 
 export type OrderDetails = z.infer<typeof orderDetailsSchema>;

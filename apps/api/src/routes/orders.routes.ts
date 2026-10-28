@@ -52,6 +52,19 @@ const orderSelect = {
 
 const orderDetailsSelect = {
   ...orderSelect,
+  components: {
+    orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
+    select: {
+      id: true,
+      inventoryItemId: true,
+      nameSnapshot: true,
+      quantity: true,
+      addedById: true,
+      addedByName: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
   statusHistory: {
     orderBy: [{ changedAt: 'desc' as const }, { id: 'desc' as const }],
     select: {
@@ -109,6 +122,10 @@ const mapOrder = (order: SelectedOrder) => {
 
 const mapOrderDetails = (order: SelectedOrderDetails) => ({
   ...mapOrder(order),
+  components: order.components.map(({ nameSnapshot, ...component }) => ({
+    ...component,
+    name: nameSnapshot,
+  })),
   statusHistory: order.statusHistory.map((entry) => ({
     ...entry,
     comment: entry.comment ?? '',

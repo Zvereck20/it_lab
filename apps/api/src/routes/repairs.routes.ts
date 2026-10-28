@@ -40,6 +40,19 @@ const repairSelect = {
 
 const repairDetailsSelect = {
   ...repairSelect,
+  components: {
+    orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
+    select: {
+      id: true,
+      inventoryItemId: true,
+      nameSnapshot: true,
+      quantity: true,
+      addedById: true,
+      addedByName: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
   statusHistory: {
     orderBy: [{ changedAt: 'desc' as const }, { id: 'desc' as const }],
     select: {
@@ -75,6 +88,16 @@ type SelectedRepair = {
 };
 
 type SelectedRepairDetails = SelectedRepair & {
+  components: Array<{
+    id: string;
+    inventoryItemId: string;
+    nameSnapshot: string;
+    quantity: number;
+    addedById: string;
+    addedByName: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
   statusHistory: Array<{
     id: string;
     status: SelectedRepair['status'];
@@ -115,6 +138,10 @@ const mapRepair = (repair: SelectedRepair) => ({
 
 const mapRepairDetails = (repair: SelectedRepairDetails) => ({
   ...mapRepair(repair),
+  components: repair.components.map(({ nameSnapshot, ...component }) => ({
+    ...component,
+    name: nameSnapshot,
+  })),
   statusHistory: repair.statusHistory.map((entry) => ({
     ...entry,
     comment: entry.comment ?? '',

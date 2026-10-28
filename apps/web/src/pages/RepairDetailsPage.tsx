@@ -20,6 +20,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 
 import { useGetSessionQuery } from '../app/api';
 import { formatRussianPhone } from '../components/PhoneField';
+import { WorkItemComponentsSection } from '../components/WorkItemComponentsSection';
 import { getApiErrorMessage } from '../features/inventory/getApiErrorMessage';
 import {
   useDeleteRepairMutation,
@@ -70,6 +71,15 @@ export const RepairDetailsPage = () => {
       && repair.technicianId === session?.user.id
     ),
   );
+  const canAddComponents = Boolean(
+    role === 'ADMIN'
+    || (
+      role === 'TECHNICIAN'
+      && repair?.assignmentMode === 'ASSIGNED'
+      && repair.technicianId === session?.user.id
+    ),
+  );
+  const canManageComponents = role === 'ADMIN';
 
   useEffect(() => {
     if (repair) {
@@ -187,6 +197,7 @@ export const RepairDetailsPage = () => {
               gap: 3,
             }}
           >
+            <DetailField label="№">{repair.number}</DetailField>
             <DetailField label="Наименование">{repair.name}</DetailField>
             <DetailField label="Ответственный">
               {repair.assignmentMode === 'FREE_QUEUE'
@@ -230,6 +241,15 @@ export const RepairDetailsPage = () => {
           </Box>
         </Stack>
       </Paper>
+
+      <WorkItemComponentsSection
+        type="repair"
+        workItemId={repair.id}
+        components={repair.components}
+        canAdd={canAddComponents}
+        canManage={canManageComponents}
+        isCompleted={repair.status === 'COMPLETED'}
+      />
 
       <Paper variant="outlined" sx={{ p: 3 }}>
         <Stack spacing={2}>

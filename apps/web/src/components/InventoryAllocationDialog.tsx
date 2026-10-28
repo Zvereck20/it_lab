@@ -100,7 +100,7 @@ export const InventoryAllocationDialog = ({
         },
       }).unwrap();
       onAllocated(
-        `«${item.name}» добавлен в ${formatOrdersCount(result.allocatedTargets)}. Остаток: ${result.remainingCount}.`,
+        `Добавлено ${quantity} шт. в ${formatOrdersCount(result.allocatedTargets)}.`,
       );
       onClose();
     } catch (requestError) {

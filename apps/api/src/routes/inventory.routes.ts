@@ -7,6 +7,8 @@ import {
   inventoryItemInputSchema,
   inventoryListQuerySchema,
   mainCategoryInputSchema,
+  workItemComponentInputSchema,
+  workItemComponentQuantityInputSchema,
 } from '@itlab/contracts';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -22,6 +24,14 @@ import {
 
 const INVENTORY_PAGE_SIZE = 50;
 const idSchema = z.string().uuid();
+const workItemTypeSchema = z.enum(['order', 'repair']);
+const workItemParamsSchema = z.object({
+  type: workItemTypeSchema,
+  id: z.string().uuid(),
+});
+const workItemComponentParamsSchema = workItemParamsSchema.extend({
+  componentId: z.string().uuid(),
+});
 
 class InventoryAllocationError extends Error {
   constructor(
@@ -32,6 +42,27 @@ class InventoryAllocationError extends Error {
     super(message);
   }
 }
+
+class InventoryComponentError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+const workItemComponentSelect = {
+  id: true,
+  inventoryItemId: true,
+  nameSnapshot: true,
+  quantity: true,
+  addedById: true,
+  addedByName: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.OrderComponentSelect;
 
 const inventoryItemSelect = {
   id: true,
@@ -63,6 +94,70 @@ const movementActor = (user: AuthUser) => ({
   performedById: user.id ?? 'ADMIN',
   performedByName: user.name,
 });
+
+const mapWorkItemComponent = (
+  component: Prisma.OrderComponentGetPayload<{ select: typeof workItemComponentSelect }>,
+) => {
+  const { nameSnapshot, ...fields } = component;
+  return { ...fields, name: nameSnapshot };
+};
+
+const assertWorkItemAccess = async (
+  transaction: Prisma.TransactionClient,
+  type: 'order' | 'repair',
+  id: string,
+  user: AuthUser,
+) => {
+  const item = type === 'order'
+    ? await transaction.order.findUnique({
+        where: { id },
+        select: { status: true, assignmentMode: true, technicianId: true },
+      })
+    : await transaction.repair.findUnique({
+        where: { id },
+        select: { status: true, assignmentMode: true, technicianId: true },
+      });
+
+  if (!item) {
+    throw new InventoryComponentError(
+      404,
+      'WORK_ITEM_NOT_FOUND',
+      type === 'order' ? 'Заказ не найден' : 'Ремонт не найден',
+    );
+  }
+  if (item.status === 'COMPLETED') {
+    throw new InventoryComponentError(
+      409,
+      'WORK_ITEM_COMPLETED',
+      'Нельзя изменить компоненты выполненной карточки',
+    );
+  }
+  if (
+    user.role === 'TECHNICIAN'
+    && (item.assignmentMode !== 'ASSIGNED' || item.technicianId !== user.id)
+  ) {
+    throw new InventoryComponentError(
+      403,
+      'WORK_ITEM_FORBIDDEN',
+      'Изменять компоненты может только назначенный на карточку специалист',
+    );
+  }
+};
+
+const findWorkItemComponent = (
+  transaction: Prisma.TransactionClient,
+  type: 'order' | 'repair',
+  workItemId: string,
+  componentId: string,
+) => type === 'order'
+  ? transaction.orderComponent.findFirst({
+      where: { id: componentId, orderId: workItemId },
+      select: workItemComponentSelect,
+    })
+  : transaction.repairComponent.findFirst({
+      where: { id: componentId, repairId: workItemId },
+      select: workItemComponentSelect,
+    });
 
 const categoryConflict = {
   code: 'CATEGORY_IN_USE',
@@ -473,7 +568,7 @@ inventoryRouter.get('/items', async (request, response) => {
     return;
   }
 
-  const { page, search, mainCategoryId, additionalCategoryId } = parsedQuery.data;
+  const { page, search, searchField, mainCategoryId, additionalCategoryId } = parsedQuery.data;
 
   if (additionalCategoryId && !mainCategoryId) {
     response.status(400).json(validationError('Сначала выберите основную категорию'));
@@ -482,12 +577,14 @@ inventoryRouter.get('/items', async (request, response) => {
 
   const where: Prisma.InventoryItemWhereInput = {
     ...(search
-      ? {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' as const } },
-            { description: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
+      ? searchField === 'name'
+        ? { name: { contains: search, mode: 'insensitive' as const } }
+        : {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' as const } },
+              { description: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
       : {}),
     ...(mainCategoryId ? { mainCategoryId } : {}),
     ...(additionalCategoryId
@@ -656,6 +753,8 @@ inventoryRouter.post(
                 inventoryItemId: item.id,
                 nameSnapshot: item.name,
                 quantity: parsedBody.data.quantity,
+                addedById: actor.performedById,
+                addedByName: actor.performedByName,
               },
               update: { quantity: { increment: parsedBody.data.quantity } },
             });
@@ -681,6 +780,8 @@ inventoryRouter.post(
                 inventoryItemId: item.id,
                 nameSnapshot: item.name,
                 quantity: parsedBody.data.quantity,
+                addedById: actor.performedById,
+                addedByName: actor.performedByName,
               },
               update: { quantity: { increment: parsedBody.data.quantity } },
             });
@@ -711,6 +812,316 @@ inventoryRouter.post(
       response.json(result);
     } catch (error) {
       if (error instanceof InventoryAllocationError) {
+        response.status(error.status).json({ code: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+  },
+);
+
+inventoryRouter.post(
+  '/work-items/:type/:id/components',
+  allowRoles('TECHNICIAN'),
+  async (request, response) => {
+    const parsedParams = workItemParamsSchema.safeParse(request.params);
+    const parsedBody = workItemComponentInputSchema.safeParse(request.body);
+    const user = request.session.user;
+
+    if (!parsedParams.success || !parsedBody.success) {
+      response.status(400).json(validationError());
+      return;
+    }
+    if (!user) {
+      response.status(401).json({ code: 'UNAUTHORIZED', message: 'Требуется авторизация' });
+      return;
+    }
+    if (user.role === 'TECHNICIAN' && !user.id) {
+      response.status(403).json({
+        code: 'FORBIDDEN',
+        message: 'Не удалось определить сотрудника',
+      });
+      return;
+    }
+
+    const { type, id } = parsedParams.data;
+    const { inventoryItemId, quantity } = parsedBody.data;
+
+    try {
+      const component = await prisma.$transaction(async (transaction) => {
+        await assertWorkItemAccess(transaction, type, id, user);
+
+        const inventoryItem = await transaction.inventoryItem.findUnique({
+          where: { id: inventoryItemId },
+          select: { id: true, name: true },
+        });
+        if (!inventoryItem) {
+          throw new InventoryComponentError(404, 'INVENTORY_ITEM_NOT_FOUND', 'Компонент не найден');
+        }
+
+        const existingComponent = type === 'order'
+          ? await transaction.orderComponent.findUnique({
+              where: { orderId_inventoryItemId: { orderId: id, inventoryItemId } },
+              select: { id: true },
+            })
+          : await transaction.repairComponent.findUnique({
+              where: { repairId_inventoryItemId: { repairId: id, inventoryItemId } },
+              select: { id: true },
+            });
+        if (existingComponent) {
+          throw new InventoryComponentError(
+            409,
+            'COMPONENT_EXISTS',
+            'Компонент уже добавлен в карточку',
+          );
+        }
+
+        const updatedStock = await transaction.inventoryItem.updateMany({
+          where: { id: inventoryItemId, count: { gte: quantity } },
+          data: { count: { decrement: quantity } },
+        });
+        if (updatedStock.count === 0) {
+          throw new InventoryComponentError(
+            409,
+            'INSUFFICIENT_STOCK',
+            'На складе недостаточно компонентов',
+          );
+        }
+
+        const actor = movementActor(user);
+        const createdComponent = type === 'order'
+          ? await transaction.orderComponent.create({
+              data: {
+                orderId: id,
+                inventoryItemId,
+                nameSnapshot: inventoryItem.name,
+                quantity,
+                addedById: actor.performedById,
+                addedByName: actor.performedByName,
+              },
+              select: workItemComponentSelect,
+            })
+          : await transaction.repairComponent.create({
+              data: {
+                repairId: id,
+                inventoryItemId,
+                nameSnapshot: inventoryItem.name,
+                quantity,
+                addedById: actor.performedById,
+                addedByName: actor.performedByName,
+              },
+              select: workItemComponentSelect,
+            });
+
+        await transaction.inventoryMovement.create({
+          data: {
+            inventoryItemId,
+            operationType: type === 'order' ? 'ORDER_ALLOCATION' : 'REPAIR_ALLOCATION',
+            quantityDelta: -quantity,
+            ...(type === 'order' ? { orderId: id } : { repairId: id }),
+            ...actor,
+          },
+        });
+
+        return createdComponent;
+      });
+
+      response.status(201).json(mapWorkItemComponent(component));
+    } catch (error) {
+      if (error instanceof InventoryComponentError) {
+        response.status(error.status).json({ code: error.code, message: error.message });
+        return;
+      }
+      if (isPrismaError(error, 'P2002')) {
+        response.status(409).json({
+          code: 'COMPONENT_EXISTS',
+          message: 'Компонент уже добавлен в карточку',
+        });
+        return;
+      }
+      throw error;
+    }
+  },
+);
+
+inventoryRouter.patch(
+  '/work-items/:type/:id/components/:componentId',
+  allowRoles('ADMIN'),
+  async (request, response) => {
+    const parsedParams = workItemComponentParamsSchema.safeParse(request.params);
+    const parsedBody = workItemComponentQuantityInputSchema.safeParse(request.body);
+    const user = request.session.user;
+
+    if (!parsedParams.success || !parsedBody.success) {
+      response.status(400).json(validationError());
+      return;
+    }
+    if (!user) {
+      response.status(401).json({ code: 'UNAUTHORIZED', message: 'Требуется авторизация' });
+      return;
+    }
+    if (user.role === 'TECHNICIAN' && !user.id) {
+      response.status(403).json({
+        code: 'FORBIDDEN',
+        message: 'Не удалось определить сотрудника',
+      });
+      return;
+    }
+
+    const { type, id, componentId } = parsedParams.data;
+    const { quantity } = parsedBody.data;
+
+    try {
+      const component = await prisma.$transaction(async (transaction) => {
+        await assertWorkItemAccess(transaction, type, id, user);
+
+        const currentComponent = await findWorkItemComponent(
+          transaction,
+          type,
+          id,
+          componentId,
+        );
+        if (!currentComponent) {
+          throw new InventoryComponentError(404, 'COMPONENT_NOT_FOUND', 'Компонент не найден');
+        }
+
+        const quantityDelta = quantity - currentComponent.quantity;
+        if (quantityDelta === 0) return currentComponent;
+
+        if (quantityDelta > 0) {
+          const updatedStock = await transaction.inventoryItem.updateMany({
+            where: {
+              id: currentComponent.inventoryItemId,
+              count: { gte: quantityDelta },
+            },
+            data: { count: { decrement: quantityDelta } },
+          });
+          if (updatedStock.count === 0) {
+            throw new InventoryComponentError(
+              409,
+              'INSUFFICIENT_STOCK',
+              'На складе недостаточно компонентов',
+            );
+          }
+        }
+
+        const updatedComponent = type === 'order'
+          ? await transaction.orderComponent.updateMany({
+              where: { id: componentId, orderId: id, quantity: currentComponent.quantity },
+              data: { quantity },
+            })
+          : await transaction.repairComponent.updateMany({
+              where: { id: componentId, repairId: id, quantity: currentComponent.quantity },
+              data: { quantity },
+            });
+        if (updatedComponent.count === 0) {
+          throw new InventoryComponentError(
+            409,
+            'COMPONENT_CHANGED',
+            'Количество компонента уже изменилось. Обновите карточку',
+          );
+        }
+
+        if (quantityDelta < 0) {
+          await transaction.inventoryItem.update({
+            where: { id: currentComponent.inventoryItemId },
+            data: { count: { increment: -quantityDelta } },
+          });
+        }
+
+        await transaction.inventoryMovement.create({
+          data: {
+            inventoryItemId: currentComponent.inventoryItemId,
+            operationType: quantityDelta > 0
+              ? type === 'order' ? 'ORDER_ALLOCATION' : 'REPAIR_ALLOCATION'
+              : type === 'order' ? 'ORDER_RETURN' : 'REPAIR_RETURN',
+            quantityDelta: -quantityDelta,
+            ...(type === 'order' ? { orderId: id } : { repairId: id }),
+            ...movementActor(user),
+          },
+        });
+
+        return findWorkItemComponent(transaction, type, id, componentId);
+      });
+
+      if (!component) {
+        response.status(404).json({ code: 'COMPONENT_NOT_FOUND', message: 'Компонент не найден' });
+        return;
+      }
+      response.json(mapWorkItemComponent(component));
+    } catch (error) {
+      if (error instanceof InventoryComponentError) {
+        response.status(error.status).json({ code: error.code, message: error.message });
+        return;
+      }
+      throw error;
+    }
+  },
+);
+
+inventoryRouter.delete(
+  '/work-items/:type/:id/components/:componentId',
+  allowRoles('ADMIN'),
+  async (request, response) => {
+    const parsedParams = workItemComponentParamsSchema.safeParse(request.params);
+    const user = request.session.user;
+
+    if (!parsedParams.success) {
+      response.status(400).json(validationError());
+      return;
+    }
+    if (!user) {
+      response.status(401).json({ code: 'UNAUTHORIZED', message: 'Требуется авторизация' });
+      return;
+    }
+    if (user.role === 'TECHNICIAN' && !user.id) {
+      response.status(403).json({
+        code: 'FORBIDDEN',
+        message: 'Не удалось определить сотрудника',
+      });
+      return;
+    }
+
+    const { type, id, componentId } = parsedParams.data;
+
+    try {
+      await prisma.$transaction(async (transaction) => {
+        await assertWorkItemAccess(transaction, type, id, user);
+
+        const component = await findWorkItemComponent(transaction, type, id, componentId);
+        if (!component) {
+          throw new InventoryComponentError(404, 'COMPONENT_NOT_FOUND', 'Компонент не найден');
+        }
+
+        const deletedComponent = type === 'order'
+          ? await transaction.orderComponent.deleteMany({ where: { id: componentId, orderId: id } })
+          : await transaction.repairComponent.deleteMany({ where: { id: componentId, repairId: id } });
+        if (deletedComponent.count === 0) {
+          throw new InventoryComponentError(
+            409,
+            'COMPONENT_CHANGED',
+            'Компонент уже изменён. Обновите карточку',
+          );
+        }
+
+        await transaction.inventoryItem.update({
+          where: { id: component.inventoryItemId },
+          data: { count: { increment: component.quantity } },
+        });
+        await transaction.inventoryMovement.create({
+          data: {
+            inventoryItemId: component.inventoryItemId,
+            operationType: type === 'order' ? 'ORDER_RETURN' : 'REPAIR_RETURN',
+            quantityDelta: component.quantity,
+            ...(type === 'order' ? { orderId: id } : { repairId: id }),
+            ...movementActor(user),
+          },
+        });
+      });
+
+      response.status(204).end();
+    } catch (error) {
+      if (error instanceof InventoryComponentError) {
         response.status(error.status).json({ code: error.code, message: error.message });
         return;
       }

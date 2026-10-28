@@ -20,6 +20,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 
 import { useGetSessionQuery } from '../app/api';
 import { formatRussianPhone } from '../components/PhoneField';
+import { WorkItemComponentsSection } from '../components/WorkItemComponentsSection';
 import { getApiErrorMessage } from '../features/inventory/getApiErrorMessage';
 import {
   useDeleteOrderMutation,
@@ -68,6 +69,15 @@ export const OrderDetailsPage = () => {
       && order.technicianId === session?.user.id
     ),
   );
+  const canAddComponents = Boolean(
+    role === 'ADMIN'
+    || (
+      role === 'TECHNICIAN'
+      && order?.assignmentMode === 'ASSIGNED'
+      && order.technicianId === session?.user.id
+    ),
+  );
+  const canManageComponents = role === 'ADMIN';
 
   useEffect(() => {
     if (order) setSelectedStatus(order.status);
@@ -170,6 +180,7 @@ export const OrderDetailsPage = () => {
               gap: 3,
             }}
           >
+            <DetailField label="№">{order.number}</DetailField>
             <DetailField label="Наименование">{order.name}</DetailField>
             <DetailField label="Ответственный">
               {order.assignmentMode === 'FREE_QUEUE'
@@ -208,6 +219,15 @@ export const OrderDetailsPage = () => {
           </Box>
         </Stack>
       </Paper>
+
+      <WorkItemComponentsSection
+        type="order"
+        workItemId={order.id}
+        components={order.components}
+        canAdd={canAddComponents}
+        canManage={canManageComponents}
+        isCompleted={order.status === 'COMPLETED'}
+      />
 
       <Paper variant="outlined" sx={{ p: 3 }}>
         <Stack spacing={2}>
