@@ -944,7 +944,7 @@ inventoryRouter.post(
 
 inventoryRouter.patch(
   '/work-items/:type/:id/components/:componentId',
-  allowRoles('TECHNICIAN'),
+  allowRoles('ADMIN'),
   async (request, response) => {
     const parsedParams = workItemComponentParamsSchema.safeParse(request.params);
     const parsedBody = workItemComponentQuantityInputSchema.safeParse(request.body);
@@ -1059,7 +1059,7 @@ inventoryRouter.patch(
 
 inventoryRouter.delete(
   '/work-items/:type/:id/components/:componentId',
-  allowRoles('TECHNICIAN'),
+  allowRoles('ADMIN'),
   async (request, response) => {
     const parsedParams = workItemComponentParamsSchema.safeParse(request.params);
     const user = request.session.user;

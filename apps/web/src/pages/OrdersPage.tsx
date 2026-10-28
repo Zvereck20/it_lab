@@ -208,6 +208,7 @@ export const OrdersPage = () => {
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell>№</TableCell>
               <TableCell>Наименование</TableCell>
               <TableCell>Компания</TableCell>
               <TableCell>Основная категория</TableCell>
@@ -218,7 +219,7 @@ export const OrdersPage = () => {
           <TableBody>
             {isFetching && !data ? (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
                   <CircularProgress size={32} />
                 </TableCell>
               </TableRow>
@@ -233,6 +234,7 @@ export const OrdersPage = () => {
                   onKeyDown={(event) => handleRowKeyDown(event, order.id)}
                   sx={{ cursor: 'pointer' }}
                 >
+                  <TableCell>{order.number}</TableCell>
                   <TableCell>{order.name}</TableCell>
                   <TableCell>{order.companyName}</TableCell>
                   <TableCell>{order.mainCategory.name}</TableCell>
@@ -246,7 +248,7 @@ export const OrdersPage = () => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 6 }}>Заказы не найдены</TableCell>
+                <TableCell colSpan={6} align="center" sx={{ py: 6 }}>Заказы не найдены</TableCell>
               </TableRow>
             )}
           </TableBody>

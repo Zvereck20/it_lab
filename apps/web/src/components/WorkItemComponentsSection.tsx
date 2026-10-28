@@ -44,6 +44,7 @@ interface WorkItemComponentsSectionProps {
   type: WorkItemType;
   workItemId: string;
   components: WorkItemComponent[];
+  canAdd: boolean;
   canManage: boolean;
   isCompleted: boolean;
 }
@@ -52,6 +53,7 @@ export const WorkItemComponentsSection = ({
   type,
   workItemId,
   components,
+  canAdd,
   canManage,
   isCompleted,
 }: WorkItemComponentsSectionProps) => {
@@ -193,7 +195,7 @@ export const WorkItemComponentsSection = ({
           <Typography component="h2" variant="h5" sx={{ flexGrow: 1 }}>
             Компоненты склада
           </Typography>
-          {canManage && !isCompleted && (
+          {canAdd && !isCompleted && (
             <Button variant="contained" onClick={() => setAddDialogOpen(true)}>
               + Добавить компонент
             </Button>

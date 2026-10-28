@@ -192,6 +192,7 @@ export const RepairsPage = () => {
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell>№</TableCell>
               <TableCell>Наименование</TableCell>
               <TableCell>Заказчик</TableCell>
               <TableCell>Ответственный</TableCell>
@@ -201,7 +202,7 @@ export const RepairsPage = () => {
           <TableBody>
             {isFetching && !data ? (
               <TableRow>
-                <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
+                <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
                   <CircularProgress size={32} />
                 </TableCell>
               </TableRow>
@@ -216,6 +217,7 @@ export const RepairsPage = () => {
                   onKeyDown={(event) => handleRowKeyDown(event, repair.id)}
                   sx={{ cursor: 'pointer' }}
                 >
+                  <TableCell>{repair.number}</TableCell>
                   <TableCell>{repair.name}</TableCell>
                   <TableCell>{getCustomerName(repair)}</TableCell>
                   <TableCell>
@@ -228,7 +230,7 @@ export const RepairsPage = () => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={4} align="center" sx={{ py: 6 }}>
+                <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
                   Ремонты не найдены
                 </TableCell>
               </TableRow>

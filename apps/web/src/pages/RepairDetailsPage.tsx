@@ -71,7 +71,7 @@ export const RepairDetailsPage = () => {
       && repair.technicianId === session?.user.id
     ),
   );
-  const canManageComponents = Boolean(
+  const canAddComponents = Boolean(
     role === 'ADMIN'
     || (
       role === 'TECHNICIAN'
@@ -79,6 +79,7 @@ export const RepairDetailsPage = () => {
       && repair.technicianId === session?.user.id
     ),
   );
+  const canManageComponents = role === 'ADMIN';
 
   useEffect(() => {
     if (repair) {
@@ -196,6 +197,7 @@ export const RepairDetailsPage = () => {
               gap: 3,
             }}
           >
+            <DetailField label="№">{repair.number}</DetailField>
             <DetailField label="Наименование">{repair.name}</DetailField>
             <DetailField label="Ответственный">
               {repair.assignmentMode === 'FREE_QUEUE'
@@ -244,6 +246,7 @@ export const RepairDetailsPage = () => {
         type="repair"
         workItemId={repair.id}
         components={repair.components}
+        canAdd={canAddComponents}
         canManage={canManageComponents}
         isCompleted={repair.status === 'COMPLETED'}
       />

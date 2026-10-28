@@ -69,7 +69,7 @@ export const OrderDetailsPage = () => {
       && order.technicianId === session?.user.id
     ),
   );
-  const canManageComponents = Boolean(
+  const canAddComponents = Boolean(
     role === 'ADMIN'
     || (
       role === 'TECHNICIAN'
@@ -77,6 +77,7 @@ export const OrderDetailsPage = () => {
       && order.technicianId === session?.user.id
     ),
   );
+  const canManageComponents = role === 'ADMIN';
 
   useEffect(() => {
     if (order) setSelectedStatus(order.status);
@@ -179,6 +180,7 @@ export const OrderDetailsPage = () => {
               gap: 3,
             }}
           >
+            <DetailField label="№">{order.number}</DetailField>
             <DetailField label="Наименование">{order.name}</DetailField>
             <DetailField label="Ответственный">
               {order.assignmentMode === 'FREE_QUEUE'
@@ -222,6 +224,7 @@ export const OrderDetailsPage = () => {
         type="order"
         workItemId={order.id}
         components={order.components}
+        canAdd={canAddComponents}
         canManage={canManageComponents}
         isCompleted={order.status === 'COMPLETED'}
       />

@@ -801,8 +801,19 @@ describe('inventory allocations', () => {
         `/api/inventory/work-items/order/${order.body.id}/components/${cardOrderComponent.body.id}`,
       )
       .send({ quantity: 5 })
+      .expect(403);
+    await agent
+      .patch(
+        `/api/inventory/work-items/order/${order.body.id}/components/${cardOrderComponent.body.id}`,
+      )
+      .send({ quantity: 5 })
       .expect(200);
     await technicianAgent
+      .delete(
+        `/api/inventory/work-items/order/${order.body.id}/components/${cardOrderComponent.body.id}`,
+      )
+      .expect(403);
+    await agent
       .delete(
         `/api/inventory/work-items/order/${order.body.id}/components/${cardOrderComponent.body.id}`,
       )
@@ -817,8 +828,19 @@ describe('inventory allocations', () => {
         `/api/inventory/work-items/repair/${repair.body.id}/components/${cardRepairComponent.body.id}`,
       )
       .send({ quantity: 2 })
+      .expect(403);
+    await agent
+      .patch(
+        `/api/inventory/work-items/repair/${repair.body.id}/components/${cardRepairComponent.body.id}`,
+      )
+      .send({ quantity: 2 })
       .expect(200);
     await technicianAgent
+      .delete(
+        `/api/inventory/work-items/repair/${repair.body.id}/components/${cardRepairComponent.body.id}`,
+      )
+      .expect(403);
+    await agent
       .delete(
         `/api/inventory/work-items/repair/${repair.body.id}/components/${cardRepairComponent.body.id}`,
       )
