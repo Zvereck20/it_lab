@@ -628,3 +628,108 @@ export const orderListResponseSchema = z.object({
 });
 
 export type OrderListResponse = z.infer<typeof orderListResponseSchema>;
+
+export const noteParticipantKeySchema = z.union([
+  z.literal('ADMIN'),
+  z.string().uuid(),
+]);
+
+export type NoteParticipantKey = z.infer<typeof noteParticipantKeySchema>;
+
+export const noteInputSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, 'Введите заголовок')
+    .max(150, 'Заголовок не должен превышать 150 символов'),
+  description: z
+    .string()
+    .trim()
+    .min(1, 'Введите описание')
+    .max(10_000, 'Описание не должно превышать 10000 символов'),
+  participantKeys: z
+    .array(noteParticipantKeySchema)
+    .min(1, 'Выберите хотя бы одного сотрудника')
+    .refine(
+      (items) => new Set(items).size === items.length,
+      'Сотрудники не должны повторяться',
+    ),
+});
+
+export type NoteInput = z.infer<typeof noteInputSchema>;
+
+export const noteParticipantSchema = z.object({
+  key: noteParticipantKeySchema,
+  userId: z.string().uuid().nullable(),
+  name: z.string(),
+  role: authRoleSchema,
+});
+
+export type NoteParticipant = z.infer<typeof noteParticipantSchema>;
+
+export const noteParticipantsResponseSchema = z.object({
+  participants: z.array(noteParticipantSchema),
+});
+
+export type NoteParticipantsResponse = z.infer<typeof noteParticipantsResponseSchema>;
+
+export const noteListItemSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  creatorName: z.string(),
+  creatorRole: authRoleSchema,
+  participants: z.array(noteParticipantSchema),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export type NoteListItem = z.infer<typeof noteListItemSchema>;
+
+export const noteCommentSchema = z.object({
+  id: z.string().uuid(),
+  authorName: z.string(),
+  authorRole: authRoleSchema,
+  text: z.string(),
+  createdAt: z.string().datetime(),
+});
+
+export type NoteComment = z.infer<typeof noteCommentSchema>;
+
+export const noteCommentInputSchema = z.object({
+  text: z
+    .string()
+    .trim()
+    .min(1, 'Введите комментарий')
+    .max(5_000, 'Комментарий не должен превышать 5000 символов'),
+});
+
+export type NoteCommentInput = z.infer<typeof noteCommentInputSchema>;
+
+export const noteDetailsSchema = noteListItemSchema.extend({
+  description: z.string(),
+  comments: z.array(noteCommentSchema),
+  permissions: z.object({
+    canEdit: z.boolean(),
+    canComment: z.boolean(),
+  }),
+});
+
+export type NoteDetails = z.infer<typeof noteDetailsSchema>;
+
+export const noteListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+});
+
+export type NoteListQuery = z.infer<typeof noteListQuerySchema>;
+
+export const noteListResponseSchema = z.object({
+  items: z.array(noteListItemSchema),
+  pagination: z.object({
+    page: z.number().int(),
+    limit: z.literal(50),
+    total: z.number().int(),
+    totalPages: z.number().int(),
+  }),
+});
+
+export type NoteListResponse = z.infer<typeof noteListResponseSchema>;

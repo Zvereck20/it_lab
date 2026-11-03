@@ -9,6 +9,7 @@ import { sessionPool } from './db/sessionPool.js';
 import { authRouter } from './routes/auth.routes.js';
 import { employeesRouter } from './routes/employees.routes.js';
 import { inventoryRouter } from './routes/inventory.routes.js';
+import { notesRouter } from './routes/notes.routes.js';
 import { ordersRouter } from './routes/orders.routes.js';
 import { repairsRouter } from './routes/repairs.routes.js';
 
@@ -51,6 +52,7 @@ export const createApp = () => {
   app.use('/api/auth', authRouter);
   app.use('/api/employees', employeesRouter);
   app.use('/api/inventory', inventoryRouter);
+  app.use('/api/notes', notesRouter);
   app.use('/api/orders', ordersRouter);
   app.use('/api/repairs', repairsRouter);
 
