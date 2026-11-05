@@ -938,6 +938,150 @@ describe('inventory allocations', () => {
   });
 });
 
+describe('notes', () => {
+  it('limits card CRUD to the creator and preserves comments after participant removal', async () => {
+    const adminAgent = request.agent(app);
+    const suffix = Date.now().toString();
+    const password = 'test-password-123';
+
+    await adminAgent
+      .post('/api/auth/login')
+      .send({ login: 'BOSS', password: process.env.ADMIN_PASSWORD })
+      .expect(200);
+
+    const manager = await adminAgent
+      .post('/api/employees')
+      .send({
+        name: 'Автор Задачи',
+        login: `note-manager-${suffix}`,
+        password,
+        role: 'MANAGER',
+      })
+      .expect(201);
+    const technician = await adminAgent
+      .post('/api/employees')
+      .send({
+        name: 'Участник Задачи',
+        login: `note-technician-${suffix}`,
+        password,
+        role: 'TECHNICIAN',
+      })
+      .expect(201);
+    const outsider = await adminAgent
+      .post('/api/employees')
+      .send({
+        name: 'Посторонний Сотрудник',
+        login: `note-outsider-${suffix}`,
+        password,
+        role: 'TECHNICIAN',
+      })
+      .expect(201);
+
+    const managerAgent = request.agent(app);
+    await managerAgent
+      .post('/api/auth/login')
+      .send({ login: manager.body.login, password })
+      .expect(200);
+    const technicianAgent = request.agent(app);
+    await technicianAgent
+      .post('/api/auth/login')
+      .send({ login: technician.body.login, password })
+      .expect(200);
+    const outsiderAgent = request.agent(app);
+    await outsiderAgent
+      .post('/api/auth/login')
+      .send({ login: outsider.body.login, password })
+      .expect(200);
+
+    const participantOptions = await managerAgent
+      .get('/api/notes/participants')
+      .expect(200);
+    expect(participantOptions.body.participants).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'ADMIN', name: 'Администратор', role: 'ADMIN' }),
+      expect.objectContaining({ key: technician.body.id, role: 'TECHNICIAN' }),
+    ]));
+
+    await managerAgent
+      .post('/api/notes')
+      .send({ title: 'Без сотрудников', description: 'Проверка', participantKeys: [] })
+      .expect(400);
+
+    const createdNote = await managerAgent
+      .post('/api/notes')
+      .send({
+        title: 'Проверка заметок',
+        description: 'Исходное описание',
+        participantKeys: [technician.body.id, 'ADMIN'],
+      })
+      .expect(201);
+    expect(createdNote.body).toMatchObject({
+      title: 'Проверка заметок',
+      creatorName: 'Автор Задачи',
+      permissions: { canEdit: true, canComment: false },
+    });
+
+    const managerList = await managerAgent.get('/api/notes').expect(200);
+    expect(managerList.body.items[0].id).toBe(createdNote.body.id);
+    const technicianList = await technicianAgent.get('/api/notes').expect(200);
+    expect(technicianList.body.items[0].id).toBe(createdNote.body.id);
+    const adminList = await adminAgent.get('/api/notes').expect(200);
+    expect(adminList.body.items[0].id).toBe(createdNote.body.id);
+    const outsiderList = await outsiderAgent.get('/api/notes').expect(200);
+    expect(outsiderList.body.items).toEqual([]);
+
+    await outsiderAgent.get(`/api/notes/${createdNote.body.id}`).expect(404);
+    await technicianAgent
+      .patch(`/api/notes/${createdNote.body.id}`)
+      .send({
+        title: 'Чужое изменение',
+        description: 'Недоступно',
+        participantKeys: ['ADMIN'],
+      })
+      .expect(404);
+    await technicianAgent.delete(`/api/notes/${createdNote.body.id}`).expect(404);
+    await managerAgent
+      .post(`/api/notes/${createdNote.body.id}/comments`)
+      .send({ text: 'Создатель использует описание' })
+      .expect(404);
+
+    const comment = await technicianAgent
+      .post(`/api/notes/${createdNote.body.id}/comments`)
+      .send({ text: 'Комментарий технического специалиста' })
+      .expect(201);
+    expect(comment.body).toMatchObject({
+      authorName: 'Участник Задачи',
+      text: 'Комментарий технического специалиста',
+    });
+
+    const updatedNote = await managerAgent
+      .patch(`/api/notes/${createdNote.body.id}`)
+      .send({
+        title: 'Проверка заметок',
+        description: 'Описание изменено создателем',
+        participantKeys: ['ADMIN'],
+      })
+      .expect(200);
+    expect(updatedNote.body.comments).toEqual([
+      expect.objectContaining({ id: comment.body.id }),
+    ]);
+    expect(updatedNote.body.participants).toEqual([
+      expect.objectContaining({ key: 'ADMIN' }),
+    ]);
+
+    await technicianAgent.get(`/api/notes/${createdNote.body.id}`).expect(404);
+    const adminDetails = await adminAgent
+      .get(`/api/notes/${createdNote.body.id}`)
+      .expect(200);
+    expect(adminDetails.body.permissions).toEqual({ canEdit: false, canComment: true });
+    expect(adminDetails.body.comments[0].id).toBe(comment.body.id);
+
+    await managerAgent.delete(`/api/notes/${createdNote.body.id}`).expect(204);
+    await adminAgent.delete(`/api/employees/${manager.body.id}`).expect(204);
+    await adminAgent.delete(`/api/employees/${technician.body.id}`).expect(204);
+    await adminAgent.delete(`/api/employees/${outsider.body.id}`).expect(204);
+  });
+});
+
 describe('inventory development seed', () => {
   it('creates 100 database items from existing category links without duplicates', async () => {
     const suffix = Date.now().toString();

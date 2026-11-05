@@ -37,7 +37,7 @@ const loginConflict = {
 
 const employeeInUse = {
   code: 'EMPLOYEE_IN_USE',
-  message: 'Сотрудник назначен на ремонт или заказ. Сначала переназначьте связанные записи',
+  message: 'Сотрудник связан с ремонтом, заказом или задачей. Сначала измените связанные записи',
 };
 
 export const employeesRouter = Router();

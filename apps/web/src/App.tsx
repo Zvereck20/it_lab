@@ -9,6 +9,8 @@ import { HomePage } from './pages/HomePage';
 import { InventoryCategoriesPage } from './pages/InventoryCategoriesPage';
 import { InventoryItemFormPage } from './pages/InventoryItemFormPage';
 import { LoginPage } from './pages/LoginPage';
+import { NoteDetailsPage } from './pages/NoteDetailsPage';
+import { NoteFormPage } from './pages/NoteFormPage';
 import { OrderCategoriesPage } from './pages/OrderCategoriesPage';
 import { OrderDetailsPage } from './pages/OrderDetailsPage';
 import { OrderFormPage } from './pages/OrderFormPage';
@@ -27,6 +29,9 @@ export const App = () => (
     <Route element={<ProtectedRoute />}>
       <Route element={<AppLayout />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/notes/new" element={<NoteFormPage />} />
+        <Route path="/notes/:id" element={<NoteDetailsPage />} />
+        <Route path="/notes/:id/edit" element={<NoteFormPage />} />
         <Route path="/warehouse" element={<WarehousePage />} />
         <Route element={<RoleRoute allowedRoles={['ADMIN']} />}>
           <Route path="/warehouse/categories" element={<InventoryCategoriesPage />} />

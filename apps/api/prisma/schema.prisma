@@ -61,20 +61,75 @@ enum InventoryMovementType {
 }
 
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  login        String   @unique @db.VarChar(50)
-  passwordHash String
-  name         String   @db.VarChar(100)
-  role         Role
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now()) @db.Timestamp(3)
-  updatedAt    DateTime @updatedAt @db.Timestamp(3)
-  repairs      Repair[]
-  statusChanges RepairStatusHistory[]
-  orders       Order[]
+  id                 String                @id @default(uuid()) @db.Uuid
+  login              String                @unique @db.VarChar(50)
+  passwordHash       String
+  name               String                @db.VarChar(100)
+  role               Role
+  isActive           Boolean               @default(true)
+  createdAt          DateTime              @default(now()) @db.Timestamp(3)
+  updatedAt          DateTime              @updatedAt @db.Timestamp(3)
+  repairs            Repair[]
+  statusChanges      RepairStatusHistory[]
+  orders             Order[]
   orderStatusChanges OrderStatusHistory[]
+  createdNotes       Note[]                @relation("NoteCreator")
+  noteParticipations NoteParticipant[]     @relation("NoteParticipantUser")
+  noteComments       NoteComment[]         @relation("NoteCommentAuthor")
 
   @@map("users")
+}
+
+model Note {
+  id            String           @id @default(uuid()) @db.Uuid
+  title         String           @db.VarChar(150)
+  description   String
+  creatorKey    String           @db.VarChar(50)
+  creatorId     String?          @db.Uuid
+  creatorName   String           @db.VarChar(100)
+  creatorRole   HistoryActorRole
+  createdAt     DateTime         @default(now()) @db.Timestamp(3)
+  updatedAt     DateTime         @updatedAt @db.Timestamp(3)
+  creator       User?            @relation("NoteCreator", fields: [creatorId], references: [id], onDelete: Restrict)
+  participants  NoteParticipant[]
+  comments      NoteComment[]
+
+  @@index([creatorKey, updatedAt])
+  @@index([updatedAt])
+  @@map("notes")
+}
+
+model NoteParticipant {
+  noteId          String           @db.Uuid
+  participantKey  String           @db.VarChar(50)
+  userId          String?          @db.Uuid
+  nameSnapshot    String           @db.VarChar(100)
+  role            HistoryActorRole
+  addedAt         DateTime         @default(now()) @db.Timestamp(3)
+  note            Note             @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  user            User?            @relation("NoteParticipantUser", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([noteId, participantKey])
+  @@index([participantKey, noteId])
+  @@index([userId])
+  @@map("note_participants")
+}
+
+model NoteComment {
+  id             String           @id @default(uuid()) @db.Uuid
+  noteId         String           @db.Uuid
+  authorKey      String           @db.VarChar(50)
+  authorId       String?          @db.Uuid
+  authorName     String           @db.VarChar(100)
+  authorRole     HistoryActorRole
+  text           String
+  createdAt      DateTime         @default(now()) @db.Timestamp(3)
+  note           Note             @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  author         User?            @relation("NoteCommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([noteId, createdAt])
+  @@index([authorId])
+  @@map("note_comments")
 }
 
 model Repair {
